@@ -1,0 +1,47 @@
+# Secrets and environment variables
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*firebase-adminsdk*.json
+*service-account*.json
+*credentials*.json
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node.js
+node_modules/
+dist/
+.vite/
+coverage/
+
+# Databases and local data
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+*.backup.db
+
+# Logs
+*.log
+logs/
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/

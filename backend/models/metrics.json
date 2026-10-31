@@ -1,0 +1,27 @@
+{
+  "dataset": "Original user-provided synthetic dataset",
+  "rows": 20000,
+  "fraud_rate": 0.5,
+  "train_rows": 16000,
+  "test_rows": 4000,
+  "split": "Stratified random 80/20; no account IDs or timestamps available",
+  "accuracy": 1.0,
+  "precision": 1.0,
+  "recall": 1.0,
+  "f1": 1.0,
+  "pr_auc": 0.9999999999999998,
+  "roc_auc": 1.0,
+  "confusion_matrix": [
+    [
+      2000,
+      0
+    ],
+    [
+      0,
+      2000
+    ]
+  ],
+  "threshold": 0.5,
+  "model": "RandomForestClassifier",
+  "note": "Synthetic-data evaluation only; not validated for real UPI transactions. Sandbox form does not supply all 20 features."
+}

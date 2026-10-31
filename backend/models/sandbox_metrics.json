@@ -1,0 +1,22 @@
+{
+  "dataset": "generated sandbox scenarios",
+  "warning": "Synthetic labels are not verified UPI fraud. These metrics cannot establish real-world detection capability.",
+  "train_rows": 12000,
+  "test_rows": 4000,
+  "fraud_prevalence": 0.0729375,
+  "precision": 0.25158562367864695,
+  "recall": 0.4075342465753425,
+  "f1": 0.3111111111111111,
+  "pr_auc": 0.23104419628533499,
+  "confusion_matrix": [
+    [
+      3354,
+      354
+    ],
+    [
+      173,
+      119
+    ]
+  ],
+  "threshold": 0.15
+}

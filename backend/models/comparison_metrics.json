@@ -1,0 +1,114 @@
+{
+  "description": "Independent synthetic test seeds and shifted distribution. NOT real UPI labels.",
+  "threshold": 0.15,
+  "models": {
+    "Logistic Regression": {
+      "synthetic_holdout": {
+        "precision": 0.0684,
+        "recall": 1.0,
+        "f1": 0.12804193186072632,
+        "pr_auc": 0.17807500460247894,
+        "confusion_matrix": [
+          [
+            0,
+            2329
+          ],
+          [
+            0,
+            171
+          ]
+        ],
+        "prevalence": 0.0684
+      },
+      "shifted_synthetic": {
+        "precision": 0.1612,
+        "recall": 1.0,
+        "f1": 0.2776438167413021,
+        "pr_auc": 0.3006294119253077,
+        "confusion_matrix": [
+          [
+            0,
+            2097
+          ],
+          [
+            0,
+            403
+          ]
+        ],
+        "prevalence": 0.1612
+      }
+    },
+    "Random Forest": {
+      "synthetic_holdout": {
+        "precision": 0.2198581560283688,
+        "recall": 0.36257309941520466,
+        "f1": 0.2737306843267108,
+        "pr_auc": 0.18211001127609,
+        "confusion_matrix": [
+          [
+            2109,
+            220
+          ],
+          [
+            109,
+            62
+          ]
+        ],
+        "prevalence": 0.0684
+      },
+      "shifted_synthetic": {
+        "precision": 0.3325,
+        "recall": 0.6600496277915633,
+        "f1": 0.44222776392352453,
+        "pr_auc": 0.39911278403140193,
+        "confusion_matrix": [
+          [
+            1563,
+            534
+          ],
+          [
+            137,
+            266
+          ]
+        ],
+        "prevalence": 0.1612
+      }
+    },
+    "Histogram Gradient Boosting": {
+      "synthetic_holdout": {
+        "precision": 0.20134228187919462,
+        "recall": 0.3508771929824561,
+        "f1": 0.255863539445629,
+        "pr_auc": 0.18975491576660478,
+        "confusion_matrix": [
+          [
+            2091,
+            238
+          ],
+          [
+            111,
+            60
+          ]
+        ],
+        "prevalence": 0.0684
+      },
+      "shifted_synthetic": {
+        "precision": 0.32,
+        "recall": 0.6352357320099256,
+        "f1": 0.4256026600166251,
+        "pr_auc": 0.3666354502871276,
+        "confusion_matrix": [
+          [
+            1553,
+            544
+          ],
+          [
+            147,
+            256
+          ]
+        ],
+        "prevalence": 0.1612
+      }
+    }
+  }
+}

@@ -1,0 +1,27 @@
+services:
+  database:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: fraudshield
+      POSTGRES_USER: fraudshield
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fraudshield -d fraudshield"]
+      interval: 5s
+      timeout: 4s
+      retries: 15
+  api:
+    build: {context: ., dockerfile: backend/Dockerfile}
+    environment:
+      DATABASE_URL: postgresql+psycopg://fraudshield:${POSTGRES_PASSWORD}@database:5432/fraudshield
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+    ports: ["127.0.0.1:8000:8000"]
+    depends_on:
+      database: {condition: service_healthy}
+  web:
+    build: {context: ., dockerfile: frontend/Dockerfile}
+    ports: ["127.0.0.1:8080:80"]
+    depends_on: [api]
+volumes:
+  postgres_data:
