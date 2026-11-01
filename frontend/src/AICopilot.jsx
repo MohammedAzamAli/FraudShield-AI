@@ -18,12 +18,9 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
+import AIProviderMonitor from "./AIProviderMonitor";
 import "./AIHistory.css";
 
-
-// ============================================================
-// API REQUEST HELPER
-// ============================================================
 
 async function request(API, route, token, payload) {
   const response = await fetch(API + route, {
@@ -36,7 +33,7 @@ async function request(API, route, token, payload) {
   });
 
   const data = await response.json().catch(() => ({
-    detail: "Invalid response from server",
+    detail: "Invalid server response",
   }));
 
   if (!response.ok) {
@@ -51,10 +48,6 @@ async function request(API, route, token, payload) {
 }
 
 
-// ============================================================
-// MAIN AI COPILOT COMPONENT
-// ============================================================
-
 export default function AICopilot({
   API,
   session,
@@ -65,7 +58,7 @@ export default function AICopilot({
   const [language, setLanguage] = useState("English");
 
   const [question, setQuestion] = useState(
-    "Explain the strongest risk indicators and what an investigator should check next."
+    "Explain the strongest fraud risk indicators and recommend investigation steps."
   );
 
   const [transaction, setTransaction] = useState("");
@@ -83,14 +76,16 @@ export default function AICopilot({
   const [historyBusy, setHistoryBusy] = useState(false);
   const [historyError, setHistoryError] = useState("");
 
+  const [monitorRefreshKey, setMonitorRefreshKey] = useState(0);
+
   const role = session?.user?.role;
-  const permitted =
-    role === "admin" || role === "analyst";
+  const permitted = role === "admin" || role === "analyst";
+  const isAdmin = role === "admin";
   const token = session?.access_token;
 
 
   // ==========================================================
-  // PROVIDER STATUS
+  // PROVIDER CONFIGURATION STATUS
   // ==========================================================
 
   useEffect(() => {
@@ -123,20 +118,19 @@ export default function AICopilot({
 
       } catch (err) {
         if (!controller.signal.aborted) {
-          console.error("AI status error:", err);
+          console.error("AI status request failed", err);
         }
       }
     }
 
     fetchStatus();
-
     return () => controller.abort();
 
   }, [API, permitted, token]);
 
 
   // ==========================================================
-  // LOAD INVESTIGATION HISTORY
+  // PERSISTENT INVESTIGATION HISTORY
   // ==========================================================
 
   const loadHistory = useCallback(async () => {
@@ -162,10 +156,7 @@ export default function AICopilot({
       }
 
       const data = await response.json();
-
-      setHistory(
-        Array.isArray(data) ? data : []
-      );
+      setHistory(Array.isArray(data) ? data : []);
 
     } catch (err) {
       setHistoryError(err.message);
@@ -174,12 +165,8 @@ export default function AICopilot({
       setHistoryBusy(false);
     }
 
-  }, [API, permitted, token]);
+  }, [API, token, permitted]);
 
-
-  // ==========================================================
-  // LOAD HISTORY ON AUTHENTICATION
-  // ==========================================================
 
   useEffect(() => {
     if (permitted && token) {
@@ -193,12 +180,12 @@ export default function AICopilot({
 
 
   // ==========================================================
-  // IMAGE FILE READER
+  // IMAGE UPLOAD
   // ==========================================================
 
   function readImage(file) {
-    setError("");
     setImage(null);
+    setError("");
 
     if (!file) return;
 
@@ -239,16 +226,14 @@ export default function AICopilot({
 
 
   // ==========================================================
-  // SUBMIT AI REQUEST
+  // EXECUTE AI REQUEST
   // ==========================================================
 
   async function run(event) {
     event.preventDefault();
 
     if (!permitted || !token) {
-      setError(
-        "Analyst or administrator login required."
-      );
+      setError("Analyst or administrator login required.");
       return;
     }
 
@@ -273,9 +258,7 @@ export default function AICopilot({
 
       } else if (tab === "screenshot") {
         if (!image) {
-          throw new Error(
-            "Choose a screenshot first."
-          );
+          throw new Error("Choose a screenshot first.");
         }
 
         route = "/api/ai/screenshot";
@@ -289,7 +272,7 @@ export default function AICopilot({
       } else {
         if (!transaction) {
           throw new Error(
-            "Choose a transaction first."
+            "Select a simulated transaction first."
           );
         }
 
@@ -313,16 +296,14 @@ export default function AICopilot({
         data.answer ||
         data.analysis ||
         data.report_markdown ||
-        "No text returned."
+        "No text returned"
       );
 
       setLastOutcome({
         provider: data.provider,
         model: data.model || "",
         requested: data.requested_provider || provider,
-        fallbackUsed: Boolean(
-          data.fallback_used
-        ),
+        fallbackUsed: Boolean(data.fallback_used),
         fallbackReason: data.fallback_reason || "",
         attempted: data.attempted_providers || [],
       });
@@ -334,12 +315,16 @@ export default function AICopilot({
 
     } finally {
       setBusy(false);
+
+      // Ask the monitoring component to refresh.
+      // This also captures unsuccessful requests.
+      setMonitorRefreshKey(current => current + 1);
     }
   }
 
 
   // ==========================================================
-  // DOWNLOAD AI RESULT
+  // DOWNLOAD RESULT
   // ==========================================================
 
   function save() {
@@ -347,7 +332,7 @@ export default function AICopilot({
 
     const content = [
       "FraudShield AI v11",
-      "Synthetic Investigation Draft",
+      "Synthetic investigation draft",
       "Human review required",
       "",
       `Provider: ${lastOutcome?.provider || "Unknown"}`,
@@ -358,9 +343,7 @@ export default function AICopilot({
 
     const blob = new Blob(
       [content],
-      {
-        type: "text/plain;charset=utf-8",
-      },
+      { type: "text/plain;charset=utf-8" },
     );
 
     const url = URL.createObjectURL(blob);
@@ -372,14 +355,9 @@ export default function AICopilot({
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
-
     URL.revokeObjectURL(url);
   }
 
-
-  // ==========================================================
-  // SWITCH TABS
-  // ==========================================================
 
   function changeTab(id) {
     setTab(id);
@@ -390,13 +368,12 @@ export default function AICopilot({
 
 
   // ==========================================================
-  // RENDER
+  // INTERFACE
   // ==========================================================
 
   return (
     <section className="panel ai-workbench">
 
-      {/* HEADING */}
       <div className="panel-head">
         <div>
           <h3>
@@ -406,7 +383,7 @@ export default function AICopilot({
 
           <p className="fine">
             Multi-provider AI · Automatic fallback ·
-            Persistent investigation history
+            Investigation history · Provider monitoring
           </p>
         </div>
 
@@ -417,31 +394,28 @@ export default function AICopilot({
 
 
       {!permitted ? (
-
         <div className="research-warning">
           <ShieldAlert size={20} />
 
           <div>
             <b>Authentication required</b>
-
             <p>
               Sign in as an analyst or administrator
               to access the AI workbench.
             </p>
           </div>
         </div>
-
       ) : (
-
         <>
-          {/* MODE TABS */}
+
+          {/* MAIN TABS */}
+
           <div className="filter-pills">
             {[
               ["ask", "Fraud Copilot"],
               ["screenshot", "Gemini Image Analysis"],
               ["report", "Case Report"],
             ].map(([id, label]) => (
-
               <button
                 type="button"
                 key={id}
@@ -450,27 +424,26 @@ export default function AICopilot({
               >
                 {label}
               </button>
-
             ))}
           </div>
 
 
-          {/* MAIN WORKBENCH */}
           <div className="ai-columns">
+
+            {/* FORM */}
 
             <form
               className="payment-form"
               onSubmit={run}
             >
 
-              {/* PROVIDER DROPDOWN */}
               {tab !== "screenshot" && (
                 <label>
                   AI provider
 
                   <select
                     value={provider}
-                    onChange={(event) =>
+                    onChange={event =>
                       setProvider(event.target.value)
                     }
                   >
@@ -482,11 +455,8 @@ export default function AICopilot({
                       "gemini",
                       "groq",
                       "openai",
-                    ].map((item) => (
-                      <option
-                        key={item}
-                        value={item}
-                      >
+                    ].map(item => (
+                      <option key={item} value={item}>
                         {item.toUpperCase()}
                         {status?.configured?.[item]
                           ? " — key configured"
@@ -496,22 +466,20 @@ export default function AICopilot({
                   </select>
 
                   <small className="fine">
-                    If the selected text provider has a
-                    temporary failure, FraudShield AI can
-                    try an alternative provider.
+                    Temporary errors may trigger retries
+                    and fallback to another text provider.
                   </small>
                 </label>
               )}
 
 
-              {/* TRANSACTION */}
               {tab !== "screenshot" && (
                 <label>
                   Simulated transaction
 
                   <select
                     value={transaction}
-                    onChange={(event) =>
+                    onChange={event =>
                       setTransaction(event.target.value)
                     }
                   >
@@ -521,7 +489,7 @@ export default function AICopilot({
                         : "General guidance"}
                     </option>
 
-                    {transactions.slice(0, 100).map((item) => (
+                    {transactions.slice(0, 100).map(item => (
                       <option
                         key={item.id}
                         value={item.id}
@@ -538,7 +506,6 @@ export default function AICopilot({
               )}
 
 
-              {/* QUESTION */}
               {tab === "ask" && (
                 <>
                   <label>
@@ -546,7 +513,7 @@ export default function AICopilot({
 
                     <select
                       value={language}
-                      onChange={(event) =>
+                      onChange={event =>
                         setLanguage(event.target.value)
                       }
                     >
@@ -554,7 +521,7 @@ export default function AICopilot({
                         "English",
                         "Hindi",
                         "Telugu",
-                      ].map((item) => (
+                      ].map(item => (
                         <option key={item}>
                           {item}
                         </option>
@@ -570,7 +537,7 @@ export default function AICopilot({
                       required
                       maxLength={1200}
                       value={question}
-                      onChange={(event) =>
+                      onChange={event =>
                         setQuestion(event.target.value)
                       }
                     />
@@ -579,7 +546,6 @@ export default function AICopilot({
               )}
 
 
-              {/* SCREENSHOT */}
               {tab === "screenshot" && (
                 <>
                   <label>
@@ -588,7 +554,7 @@ export default function AICopilot({
                     <input
                       type="file"
                       accept="image/png,image/jpeg,image/webp"
-                      onChange={(event) =>
+                      onChange={event =>
                         readImage(event.target.files?.[0])
                       }
                     />
@@ -596,18 +562,16 @@ export default function AICopilot({
 
                   <p className="fine">
                     {image?.name ||
-                      "PNG, JPEG, WebP · Maximum 3 MB"}
+                      "PNG, JPEG or WebP · Maximum 3 MB"}
                   </p>
 
                   <p className="fine">
-                    Screenshot analysis uses Gemini only.
-                    No text-only fallback is attempted.
+                    Image analysis uses Gemini only.
                   </p>
                 </>
               )}
 
 
-              {/* NOTES */}
               {tab !== "ask" && (
                 <label>
                   {tab === "report"
@@ -620,16 +584,15 @@ export default function AICopilot({
                       tab === "report" ? 1500 : 450
                     }
                     value={notes}
-                    onChange={(event) =>
+                    onChange={event =>
                       setNotes(event.target.value)
                     }
-                    placeholder="Use only synthetic or redacted data"
+                    placeholder="Use synthetic or redacted data"
                   />
                 </label>
               )}
 
 
-              {/* SUBMIT */}
               <button
                 type="submit"
                 className="primary"
@@ -649,9 +612,9 @@ export default function AICopilot({
             </form>
 
 
-            {/* AI RESULT PANEL */}
-            <div className="ai-response">
+            {/* RESPONSE PANEL */}
 
+            <div className="ai-response">
               <h4>
                 {tab === "ask"
                   ? "AI Assessment"
@@ -668,8 +631,6 @@ export default function AICopilot({
                 </p>
               )}
 
-
-              {/* PROVIDER ACTUALLY USED */}
               {lastOutcome && (
                 <div
                   style={{
@@ -678,7 +639,6 @@ export default function AICopilot({
                     borderRadius: 10,
                     border: "1px solid #35517b",
                     background: "#14243d",
-                    color: "#dbe8fb",
                   }}
                 >
                   <div
@@ -686,7 +646,6 @@ export default function AICopilot({
                       display: "flex",
                       alignItems: "center",
                       gap: 8,
-                      flexWrap: "wrap",
                     }}
                   >
                     {lastOutcome.fallbackUsed
@@ -708,23 +667,20 @@ export default function AICopilot({
 
                   {lastOutcome.fallbackUsed && (
                     <p className="fine">
-                      Automatic fallback activated.
-                      Previous provider issue:{" "}
-                      {lastOutcome.fallbackReason}.
+                      Fallback activated:{" "}
+                      {lastOutcome.fallbackReason}
                     </p>
                   )}
 
                   {lastOutcome.attempted.length > 1 && (
                     <p className="fine">
-                      Provider sequence:{" "}
+                      Sequence:{" "}
                       {lastOutcome.attempted.join(" → ")}
                     </p>
                   )}
                 </div>
               )}
 
-
-              {/* OUTPUT */}
               {result ? (
                 <>
                   <div className="ai-result">
@@ -743,11 +699,9 @@ export default function AICopilot({
               ) : (
                 <div className="empty">
                   <FileText size={40} />
-
                   <p>
                     AI output will appear here.
-                    Responses are advisory and require
-                    independent verification.
+                    Every result requires human review.
                   </p>
                 </div>
               )}
@@ -756,9 +710,9 @@ export default function AICopilot({
           </div>
 
 
-          {/* PERSISTENT INVESTIGATION HISTORY */}
-          <div className="ai-history-panel">
+          {/* PERSISTENT HISTORY */}
 
+          <div className="ai-history-panel">
             <div className="ai-history-heading">
               <div>
                 <h3>
@@ -767,8 +721,7 @@ export default function AICopilot({
                 </h3>
 
                 <p className="fine">
-                  Previous Copilot responses, screenshot
-                  analyses and investigation drafts.
+                  Saved AI responses and reports.
                 </p>
               </div>
 
@@ -785,26 +738,23 @@ export default function AICopilot({
               </button>
             </div>
 
-
             {historyError && (
               <p className="error">
                 {historyError}
               </p>
             )}
 
-
             {history.length === 0 ? (
               <p className="fine">
-                No saved AI investigations found.
+                No saved investigations found.
               </p>
             ) : (
               <div className="ai-history-list">
-                {history.map((item) => (
+                {history.map(item => (
                   <article
                     key={item.id}
                     className="ai-history-item"
                   >
-
                     <div className="ai-history-meta">
                       <strong>
                         {item.operation.toUpperCase()}
@@ -822,14 +772,12 @@ export default function AICopilot({
                       </span>
                     </div>
 
-
                     {item.transaction_id && (
                       <p className="fine">
                         Transaction: #
                         {item.transaction_id.slice(0, 8)}
                       </p>
                     )}
-
 
                     <p className="ai-history-preview">
                       {item.response_text.slice(0, 240)}
@@ -838,12 +786,12 @@ export default function AICopilot({
                         : ""}
                     </p>
 
-
                     <button
                       type="button"
                       className="outline-btn"
                       onClick={() => {
                         setResult(item.response_text);
+
                         setLastOutcome({
                           provider: item.provider,
                           model: item.model_name,
@@ -857,7 +805,6 @@ export default function AICopilot({
                       <Eye size={16} />
                       View Saved Response
                     </button>
-
                   </article>
                 ))}
               </div>
@@ -865,25 +812,36 @@ export default function AICopilot({
           </div>
 
 
-          {/* PRIVACY WARNING */}
+          {/* v11 PHASE 3: ADMIN MONITORING */}
+
+          {isAdmin && (
+            <AIProviderMonitor
+              API={API}
+              token={token}
+              enabled={isAdmin}
+              refreshKey={monitorRefreshKey}
+            />
+          )}
+
+
+          {/* PRIVACY NOTICE */}
+
           <div className="research-warning">
             <ShieldAlert size={20} />
 
             <div>
-              <b>Privacy and AI limitations</b>
+              <b>Privacy and research limitations</b>
 
               <p>
-                Text investigations may be sent to a
-                fallback external AI provider if the
-                primary provider is unavailable.
+                AI analysis uses external providers.
                 Use synthetic or redacted data only.
-                Generated outputs are stored in the
-                investigation history database.
+                Responses are stored in investigation
+                history. Provider monitoring records
+                request outcomes and latency, not
+                prompts, keys, images, or AI responses.
 
-                Screenshot analysis uses Gemini only.
-                AI output does not automatically change
-                transaction risk classifications or
-                close investigation cases.
+                Results are advisory and never
+                automatically change fraud decisions.
               </p>
             </div>
           </div>

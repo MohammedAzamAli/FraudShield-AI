@@ -1,0 +1,208 @@
+
+/* FraudShield AI v11 - Provider Monitoring */
+
+.monitor-panel {
+  margin-top: 24px;
+  padding: 24px;
+  border: 1px solid #30435e;
+  border-radius: 16px;
+  background: #101d33;
+  color: #e8eef9;
+}
+
+.monitor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.monitor-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 8px;
+}
+
+.monitor-header p,
+.monitor-disclaimer {
+  color: #9cb3d2;
+  font-size: 12px;
+}
+
+.monitor-header .outline-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.monitor-overview {
+  display: grid;
+  grid-template-columns: repeat(
+    4,
+    minmax(0, 1fr)
+  );
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.monitor-overview-item,
+.monitor-provider-card {
+  padding: 17px;
+  background: #17283f;
+  border: 1px solid #314969;
+  border-radius: 12px;
+}
+
+.monitor-overview-item {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.monitor-overview-item span {
+  color: #9bb1ce;
+  font-size: 12px;
+}
+
+.monitor-overview-item strong {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.monitor-provider-grid {
+  display: grid;
+  grid-template-columns: repeat(
+    3,
+    minmax(0, 1fr)
+  );
+  gap: 14px;
+}
+
+.monitor-provider-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.monitor-provider-title strong {
+  color: #f3f7ff;
+}
+
+.monitor-health {
+  font-size: 11px;
+  padding: 5px 9px;
+  border-radius: 100px;
+  background: #2b3b52;
+  color: #dbe7ff;
+}
+
+.monitor-operational {
+  background: #163d30;
+  color: #83e4b1;
+}
+
+.monitor-degraded,
+.monitor-billing_issue {
+  background: #473818;
+  color: #f1c973;
+}
+
+.monitor-unavailable,
+.monitor-access_issue {
+  background: #48242b;
+  color: #ff9aa8;
+}
+
+.monitor-stat-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.monitor-stat-line span,
+.monitor-stat-line small {
+  color: #9db2d0;
+}
+
+.monitor-stat-line b {
+  color: #ecf3ff;
+}
+
+.monitor-last-error {
+  color: #f1c973;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.monitor-activity {
+  margin-top: 24px;
+}
+
+.monitor-activity h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.monitor-table-wrap {
+  overflow-x: auto;
+}
+
+.monitor-table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 570px;
+  font-size: 12px;
+}
+
+.monitor-table th,
+.monitor-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #2b405b;
+  white-space: nowrap;
+}
+
+.monitor-table th {
+  color: #9db9e3;
+  font-weight: 600;
+}
+
+.monitor-table td {
+  color: #dce7f7;
+}
+
+.monitor-disclaimer {
+  margin-top: 17px;
+  line-height: 1.6;
+}
+
+@media (max-width: 950px) {
+  .monitor-overview {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .monitor-provider-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 550px) {
+  .monitor-panel {
+    padding: 15px;
+  }
+
+  .monitor-overview {
+    grid-template-columns: 1fr 1fr;
+  }
+}
