@@ -7,7 +7,6 @@ import React, {
 
 import {
   Bot,
-  ImageUp,
   FileText,
   ShieldAlert,
   Send,
@@ -15,6 +14,8 @@ import {
   RefreshCw,
   History,
   Eye,
+  CheckCircle2,
+  AlertTriangle,
 } from "lucide-react";
 
 import "./AIHistory.css";
@@ -51,7 +52,7 @@ async function request(API, route, token, payload) {
 
 
 // ============================================================
-// MAIN COMPONENT
+// MAIN AI COPILOT COMPONENT
 // ============================================================
 
 export default function AICopilot({
@@ -60,7 +61,7 @@ export default function AICopilot({
   transactions = [],
 }) {
   const [tab, setTab] = useState("ask");
-  const [provider, setProvider] = useState("gemini");
+  const [provider, setProvider] = useState("auto");
   const [language, setLanguage] = useState("English");
 
   const [question, setQuestion] = useState(
@@ -74,23 +75,22 @@ export default function AICopilot({
   const [result, setResult] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState(null);
 
-  // v11 history states
+  const [status, setStatus] = useState(null);
+  const [lastOutcome, setLastOutcome] = useState(null);
+
   const [history, setHistory] = useState([]);
   const [historyBusy, setHistoryBusy] = useState(false);
   const [historyError, setHistoryError] = useState("");
 
   const role = session?.user?.role;
-
   const permitted =
     role === "admin" || role === "analyst";
-
   const token = session?.access_token;
 
 
   // ==========================================================
-  // FETCH AI PROVIDER STATUS
+  // PROVIDER STATUS
   // ==========================================================
 
   useEffect(() => {
@@ -113,11 +113,7 @@ export default function AICopilot({
           }
         );
 
-        if (!response.ok) {
-          throw new Error(
-            `Provider status failed: ${response.status}`
-          );
-        }
+        if (!response.ok) return;
 
         const data = await response.json();
 
@@ -136,17 +132,15 @@ export default function AICopilot({
 
     return () => controller.abort();
 
-  }, [API, token, permitted]);
+  }, [API, permitted, token]);
 
 
   // ==========================================================
-  // v11: LOAD AI INVESTIGATION HISTORY
+  // LOAD INVESTIGATION HISTORY
   // ==========================================================
 
   const loadHistory = useCallback(async () => {
-    if (!permitted || !token) {
-      return;
-    }
+    if (!permitted || !token) return;
 
     setHistoryBusy(true);
     setHistoryError("");
@@ -163,26 +157,28 @@ export default function AICopilot({
 
       if (!response.ok) {
         throw new Error(
-          `Unable to load history (${response.status})`
+          `History request failed (${response.status})`
         );
       }
 
       const data = await response.json();
-      setHistory(Array.isArray(data) ? data : []);
+
+      setHistory(
+        Array.isArray(data) ? data : []
+      );
 
     } catch (err) {
       setHistoryError(err.message);
-      console.error("History error:", err);
 
     } finally {
       setHistoryBusy(false);
     }
 
-  }, [API, token, permitted]);
+  }, [API, permitted, token]);
 
 
   // ==========================================================
-  // AUTO-LOAD HISTORY AFTER LOGIN
+  // LOAD HISTORY ON AUTHENTICATION
   // ==========================================================
 
   useEffect(() => {
@@ -190,34 +186,34 @@ export default function AICopilot({
       loadHistory();
     } else {
       setHistory([]);
-      setHistoryError("");
       setResult("");
+      setLastOutcome(null);
     }
   }, [permitted, token, loadHistory]);
 
 
   // ==========================================================
-  // SCREENSHOT FILE READER
+  // IMAGE FILE READER
   // ==========================================================
 
-  async function readImage(file) {
-    if (!file) return;
-
+  function readImage(file) {
     setError("");
     setImage(null);
 
-    const allowedTypes = [
+    if (!file) return;
+
+    const allowed = [
       "image/png",
       "image/jpeg",
       "image/webp",
     ];
 
     if (
-      !allowedTypes.includes(file.type) ||
+      !allowed.includes(file.type) ||
       file.size > 3 * 1024 * 1024
     ) {
       setError(
-        "Select a PNG, JPEG or WebP image up to 3 MB."
+        "Choose a PNG, JPEG, or WebP image up to 3 MB."
       );
       return;
     }
@@ -226,14 +222,16 @@ export default function AICopilot({
 
     reader.onload = () => {
       setImage({
-        mime_type: file.type,
-        image_base64: String(reader.result).split(",")[1],
         name: file.name,
+        mime_type: file.type,
+        image_base64: String(
+          reader.result
+        ).split(",")[1],
       });
     };
 
     reader.onerror = () => {
-      setError("Unable to read the selected image.");
+      setError("Unable to read screenshot.");
     };
 
     reader.readAsDataURL(file);
@@ -241,26 +239,28 @@ export default function AICopilot({
 
 
   // ==========================================================
-  // RUN AI REQUEST
+  // SUBMIT AI REQUEST
   // ==========================================================
 
   async function run(event) {
     event.preventDefault();
 
     if (!permitted || !token) {
-      setError("Analyst or administrator login required.");
+      setError(
+        "Analyst or administrator login required."
+      );
       return;
     }
 
     setError("");
     setResult("");
+    setLastOutcome(null);
     setBusy(true);
 
     try {
       let route;
       let payload;
 
-      // FRAUD COPILOT
       if (tab === "ask") {
         route = "/api/ai/ask";
 
@@ -270,12 +270,12 @@ export default function AICopilot({
           language,
           transaction_id: transaction || null,
         };
-      }
 
-      // SCREENSHOT ANALYSIS
-      else if (tab === "screenshot") {
+      } else if (tab === "screenshot") {
         if (!image) {
-          throw new Error("Choose an image first.");
+          throw new Error(
+            "Choose a screenshot first."
+          );
         }
 
         route = "/api/ai/screenshot";
@@ -285,13 +285,11 @@ export default function AICopilot({
           image_base64: image.image_base64,
           description: notes,
         };
-      }
 
-      // INVESTIGATION REPORT
-      else {
+      } else {
         if (!transaction) {
           throw new Error(
-            "Select a simulated transaction first."
+            "Choose a transaction first."
           );
         }
 
@@ -308,17 +306,27 @@ export default function AICopilot({
         API,
         route,
         token,
-        payload
+        payload,
       );
 
       setResult(
         data.answer ||
         data.analysis ||
         data.report_markdown ||
-        "No text returned"
+        "No text returned."
       );
 
-      // v11: Reload saved AI investigation history
+      setLastOutcome({
+        provider: data.provider,
+        model: data.model || "",
+        requested: data.requested_provider || provider,
+        fallbackUsed: Boolean(
+          data.fallback_used
+        ),
+        fallbackReason: data.fallback_reason || "",
+        attempted: data.attempted_providers || [],
+      });
+
       await loadHistory();
 
     } catch (err) {
@@ -331,21 +339,28 @@ export default function AICopilot({
 
 
   // ==========================================================
-  // DOWNLOAD RESULT
+  // DOWNLOAD AI RESULT
   // ==========================================================
 
   function save() {
     if (!result) return;
 
-    const content =
-      "FraudShield AI v11 — Investigation Draft\n" +
-      "SYNTHETIC SANDBOX ONLY\n" +
-      "HUMAN REVIEW REQUIRED\n\n" +
-      result;
+    const content = [
+      "FraudShield AI v11",
+      "Synthetic Investigation Draft",
+      "Human review required",
+      "",
+      `Provider: ${lastOutcome?.provider || "Unknown"}`,
+      `Model: ${lastOutcome?.model || "Unknown"}`,
+      "",
+      result,
+    ].join("\n");
 
     const blob = new Blob(
       [content],
-      { type: "text/plain;charset=utf-8" }
+      {
+        type: "text/plain;charset=utf-8",
+      },
     );
 
     const url = URL.createObjectURL(blob);
@@ -354,35 +369,34 @@ export default function AICopilot({
     anchor.href = url;
     anchor.download = `fraudshield-${tab}-draft.txt`;
 
+    document.body.appendChild(anchor);
     anchor.click();
+    anchor.remove();
 
     URL.revokeObjectURL(url);
   }
 
 
   // ==========================================================
-  // CHANGE TAB
+  // SWITCH TABS
   // ==========================================================
 
   function changeTab(id) {
     setTab(id);
     setResult("");
     setError("");
-
-    if (id === "screenshot") {
-      setProvider("gemini");
-    }
+    setLastOutcome(null);
   }
 
 
   // ==========================================================
-  // FRONTEND
+  // RENDER
   // ==========================================================
 
   return (
     <section className="panel ai-workbench">
 
-      {/* HEADER */}
+      {/* HEADING */}
       <div className="panel-head">
         <div>
           <h3>
@@ -391,8 +405,8 @@ export default function AICopilot({
           </h3>
 
           <p className="fine">
-            Analyst-only assistant · Synthetic or redacted
-            data only · Persistent investigation history
+            Multi-provider AI · Automatic fallback ·
+            Persistent investigation history
           </p>
         </div>
 
@@ -412,7 +426,7 @@ export default function AICopilot({
 
             <p>
               Sign in as an analyst or administrator
-              to access the AI investigation tools.
+              to access the AI workbench.
             </p>
           </div>
         </div>
@@ -420,7 +434,7 @@ export default function AICopilot({
       ) : (
 
         <>
-          {/* TABS */}
+          {/* MODE TABS */}
           <div className="filter-pills">
             {[
               ["ask", "Fraud Copilot"],
@@ -429,8 +443,8 @@ export default function AICopilot({
             ].map(([id, label]) => (
 
               <button
-                key={id}
                 type="button"
+                key={id}
                 className={tab === id ? "selected" : ""}
                 onClick={() => changeTab(id)}
               >
@@ -441,7 +455,7 @@ export default function AICopilot({
           </div>
 
 
-          {/* AI WORKBENCH */}
+          {/* MAIN WORKBENCH */}
           <div className="ai-columns">
 
             <form
@@ -449,7 +463,7 @@ export default function AICopilot({
               onSubmit={run}
             >
 
-              {/* PROVIDER */}
+              {/* PROVIDER DROPDOWN */}
               {tab !== "screenshot" && (
                 <label>
                   AI provider
@@ -460,29 +474,37 @@ export default function AICopilot({
                       setProvider(event.target.value)
                     }
                   >
+                    <option value="auto">
+                      AUTOMATIC (Gemini → Groq)
+                    </option>
+
                     {[
-                      "openai",
                       "gemini",
                       "groq",
+                      "openai",
                     ].map((item) => (
-
                       <option
                         key={item}
                         value={item}
                       >
                         {item.toUpperCase()}
                         {status?.configured?.[item]
-                          ? " ✓ key configured"
-                          : ""}
+                          ? " — key configured"
+                          : " — not configured"}
                       </option>
-
                     ))}
                   </select>
+
+                  <small className="fine">
+                    If the selected text provider has a
+                    temporary failure, FraudShield AI can
+                    try an alternative provider.
+                  </small>
                 </label>
               )}
 
 
-              {/* TRANSACTION SELECTION */}
+              {/* TRANSACTION */}
               {tab !== "screenshot" && (
                 <label>
                   Simulated transaction
@@ -495,30 +517,28 @@ export default function AICopilot({
                   >
                     <option value="">
                       {tab === "report"
-                        ? "Choose a transaction"
-                        : "General guidance (no transaction)"}
+                        ? "Choose transaction"
+                        : "General guidance"}
                     </option>
 
                     {transactions.slice(0, 100).map((item) => (
-
                       <option
                         key={item.id}
                         value={item.id}
                       >
                         #{item.id.slice(0, 8)}
                         {" · ₹"}
-                        {item.amount.toLocaleString("en-IN")}
+                        {Number(item.amount).toLocaleString("en-IN")}
                         {" · "}
                         {item.risk}
                       </option>
-
                     ))}
                   </select>
                 </label>
               )}
 
 
-              {/* ASK COPILOT */}
+              {/* QUESTION */}
               {tab === "ask" && (
                 <>
                   <label>
@@ -559,11 +579,11 @@ export default function AICopilot({
               )}
 
 
-              {/* IMAGE ANALYSIS */}
+              {/* SCREENSHOT */}
               {tab === "screenshot" && (
                 <>
                   <label>
-                    Upload redacted screenshot
+                    Upload synthetic or redacted screenshot
 
                     <input
                       type="file"
@@ -576,7 +596,12 @@ export default function AICopilot({
 
                   <p className="fine">
                     {image?.name ||
-                      "PNG, JPEG or WebP up to 3 MB. Remove personal information before uploading."}
+                      "PNG, JPEG, WebP · Maximum 3 MB"}
+                  </p>
+
+                  <p className="fine">
+                    Screenshot analysis uses Gemini only.
+                    No text-only fallback is attempted.
                   </p>
                 </>
               )}
@@ -598,13 +623,13 @@ export default function AICopilot({
                     onChange={(event) =>
                       setNotes(event.target.value)
                     }
-                    placeholder="Synthetic or redacted information only"
+                    placeholder="Use only synthetic or redacted data"
                   />
                 </label>
               )}
 
 
-              {/* SUBMIT BUTTON */}
+              {/* SUBMIT */}
               <button
                 type="submit"
                 className="primary"
@@ -613,18 +638,18 @@ export default function AICopilot({
                 <Send size={16} />
 
                 {busy
-                  ? "Contacting provider..."
+                  ? "Processing AI request..."
                   : tab === "ask"
                     ? "Ask Copilot"
                     : tab === "screenshot"
-                      ? "Analyze screenshot"
-                      : "Draft investigation report"}
+                      ? "Analyze Screenshot"
+                      : "Generate Report"}
               </button>
 
             </form>
 
 
-            {/* AI RESPONSE */}
+            {/* AI RESULT PANEL */}
             <div className="ai-response">
 
               <h4>
@@ -632,17 +657,75 @@ export default function AICopilot({
                   ? "AI Assessment"
                   : tab === "screenshot"
                     ? "Screenshot Observations"
-                    : "Draft Report"}
+                    : "Investigation Draft"}
               </h4>
 
               {error && (
                 <p className="error">
+                  <AlertTriangle size={15} />
+                  {" "}
                   {error}
                 </p>
               )}
 
-              {result ? (
 
+              {/* PROVIDER ACTUALLY USED */}
+              {lastOutcome && (
+                <div
+                  style={{
+                    marginBottom: 14,
+                    padding: 12,
+                    borderRadius: 10,
+                    border: "1px solid #35517b",
+                    background: "#14243d",
+                    color: "#dbe8fb",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    {lastOutcome.fallbackUsed
+                      ? <RefreshCw size={16} />
+                      : <CheckCircle2 size={16} />
+                    }
+
+                    <strong>
+                      Answered by{" "}
+                      {lastOutcome.provider?.toUpperCase()}
+                    </strong>
+                  </div>
+
+                  {lastOutcome.model && (
+                    <p className="fine">
+                      Model: {lastOutcome.model}
+                    </p>
+                  )}
+
+                  {lastOutcome.fallbackUsed && (
+                    <p className="fine">
+                      Automatic fallback activated.
+                      Previous provider issue:{" "}
+                      {lastOutcome.fallbackReason}.
+                    </p>
+                  )}
+
+                  {lastOutcome.attempted.length > 1 && (
+                    <p className="fine">
+                      Provider sequence:{" "}
+                      {lastOutcome.attempted.join(" → ")}
+                    </p>
+                  )}
+                </div>
+              )}
+
+
+              {/* OUTPUT */}
+              {result ? (
                 <>
                   <div className="ai-result">
                     {result}
@@ -657,29 +740,26 @@ export default function AICopilot({
                     Download Draft
                   </button>
                 </>
-
               ) : (
-
                 <div className="empty">
                   <FileText size={40} />
 
                   <p>
                     AI output will appear here.
-                    Results are advisory and may
-                    contain errors.
+                    Responses are advisory and require
+                    independent verification.
                   </p>
                 </div>
-
               )}
             </div>
+
           </div>
 
 
-          {/* v11: PERSISTENT INVESTIGATION HISTORY */}
+          {/* PERSISTENT INVESTIGATION HISTORY */}
           <div className="ai-history-panel">
 
             <div className="ai-history-heading">
-
               <div>
                 <h3>
                   <History size={21} />
@@ -687,16 +767,16 @@ export default function AICopilot({
                 </h3>
 
                 <p className="fine">
-                  Saved AI explanations, screenshot
-                  analyses and investigation reports.
+                  Previous Copilot responses, screenshot
+                  analyses and investigation drafts.
                 </p>
               </div>
 
               <button
                 type="button"
                 className="outline-btn"
-                onClick={loadHistory}
                 disabled={historyBusy}
+                onClick={loadHistory}
               >
                 <RefreshCw size={16} />
                 {historyBusy
@@ -714,17 +794,12 @@ export default function AICopilot({
 
 
             {history.length === 0 ? (
-
               <p className="fine">
                 No saved AI investigations found.
               </p>
-
             ) : (
-
               <div className="ai-history-list">
-
                 {history.map((item) => (
-
                   <article
                     key={item.id}
                     className="ai-history-item"
@@ -758,7 +833,6 @@ export default function AICopilot({
 
                     <p className="ai-history-preview">
                       {item.response_text.slice(0, 240)}
-
                       {item.response_text.length > 240
                         ? "..."
                         : ""}
@@ -768,21 +842,26 @@ export default function AICopilot({
                     <button
                       type="button"
                       className="outline-btn"
-                      onClick={() =>
-                        setResult(item.response_text)
-                      }
+                      onClick={() => {
+                        setResult(item.response_text);
+                        setLastOutcome({
+                          provider: item.provider,
+                          model: item.model_name,
+                          requested: item.provider,
+                          fallbackUsed: false,
+                          fallbackReason: "",
+                          attempted: [],
+                        });
+                      }}
                     >
                       <Eye size={16} />
                       View Saved Response
                     </button>
 
                   </article>
-
                 ))}
-
               </div>
             )}
-
           </div>
 
 
@@ -791,25 +870,25 @@ export default function AICopilot({
             <ShieldAlert size={20} />
 
             <div>
-              <b>Privacy and research limitations</b>
+              <b>Privacy and AI limitations</b>
 
               <p>
-                AI requests are sent to external providers.
-                Use synthetic or redacted information only.
-                Generated responses are saved in the local
-                database for investigation history.
+                Text investigations may be sent to a
+                fallback external AI provider if the
+                primary provider is unavailable.
+                Use synthetic or redacted data only.
+                Generated outputs are stored in the
+                investigation history database.
 
-                Uploaded screenshot bytes are not stored
-                in the history table.
-
-                AI results never automatically change fraud
-                classifications or close investigation cases.
+                Screenshot analysis uses Gemini only.
+                AI output does not automatically change
+                transaction risk classifications or
+                close investigation cases.
               </p>
             </div>
           </div>
 
         </>
-
       )}
 
     </section>
