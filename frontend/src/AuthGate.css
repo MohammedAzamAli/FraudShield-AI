@@ -1,0 +1,500 @@
+
+/* ===================================================
+   FRAUDSHIELD AI v11 - LOGIN FIRST
+   Complete authentication page styling
+   =================================================== */
+
+.fs-auth-shell {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: #070f20;
+  color: #eaf1ff;
+  overflow: hidden;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.fs-auth-shell *,
+.fs-auth-shell *::before,
+.fs-auth-shell *::after {
+  box-sizing: border-box;
+}
+
+.fs-auth-background {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse at 15% 35%,
+      rgba(45, 98, 225, 0.19),
+      transparent 48%
+    ),
+    radial-gradient(
+      ellipse at 85% 70%,
+      rgba(14, 165, 180, 0.07),
+      transparent 43%
+    ),
+    #070f20;
+}
+
+.fs-auth-layout {
+  position: relative;
+  z-index: 1;
+  min-height: 100dvh;
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 40px 6%;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(350px, 0.9fr);
+  align-items: center;
+  gap: clamp(36px, 7vw, 110px);
+}
+
+.fs-auth-showcase {
+  display: flex;
+  flex-direction: column;
+  gap: 62px;
+}
+
+.fs-auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.fs-auth-logo {
+  width: 54px;
+  height: 54px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid #4a7af1;
+  border-radius: 15px;
+  background: linear-gradient(145deg, #326cf4, #153b9c);
+  color: #fff;
+  box-shadow: 0 12px 36px rgba(37, 99, 235, 0.27);
+}
+
+.fs-auth-brand h1 {
+  margin: 0;
+  font-size: 25px;
+  line-height: 1.2;
+  letter-spacing: -0.8px;
+  color: #f5f8ff;
+}
+
+.fs-auth-brand h1 span {
+  color: #6ca1ff;
+}
+
+.fs-auth-brand p {
+  margin: 7px 0 0;
+  font-size: 10px;
+  letter-spacing: 2.2px;
+  color: #86a5d4;
+}
+
+.fs-auth-hero {
+  max-width: 660px;
+}
+
+.fs-auth-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #81a9fa;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.fs-auth-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #29dfac;
+  box-shadow: 0 0 16px rgba(41, 223, 172, 0.65);
+}
+
+.fs-auth-hero h2 {
+  margin: 28px 0;
+  font-size: clamp(35px, 4.25vw, 64px);
+  line-height: 1.12;
+  letter-spacing: -2px;
+  font-weight: 750;
+  color: #fff;
+}
+
+.fs-auth-hero h2 span {
+  color: #6698ff;
+}
+
+.fs-auth-hero > p {
+  max-width: 540px;
+  color: #a1b5d4;
+  font-size: 15px;
+  line-height: 1.85;
+}
+
+.fs-auth-features {
+  display: grid;
+  gap: 26px;
+}
+
+.fs-auth-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+}
+
+.fs-auth-feature-icon {
+  width: 43px;
+  height: 43px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid #284977;
+  border-radius: 12px;
+  background: #122341;
+  color: #81aaff;
+}
+
+.fs-auth-feature strong {
+  display: block;
+  color: #edf4ff;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.fs-auth-feature p {
+  margin: 0;
+  color: #96accb;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.fs-auth-footer {
+  margin: 0;
+  color: #667d9f;
+  font-size: 11px;
+  line-height: 1.8;
+}
+
+.fs-auth-form-side {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.fs-auth-card {
+  width: 100%;
+  max-width: 490px;
+  padding: clamp(22px, 3vw, 38px);
+  background: rgba(17, 30, 52, 0.97);
+  border: 1px solid #304461;
+  border-radius: 22px;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.34);
+}
+
+.fs-auth-card-intro {
+  margin-bottom: 28px;
+}
+
+.fs-auth-lock {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: #183367;
+  color: #8eb4ff;
+  margin-bottom: 23px;
+}
+
+.fs-auth-card-intro h2 {
+  margin: 0 0 9px;
+  color: #f4f8ff;
+  font-size: 27px;
+  letter-spacing: -0.5px;
+}
+
+.fs-auth-card-intro p {
+  color: #9fb3d1;
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 0;
+}
+
+/* Restyle the existing FirebaseSecurity form
+   without changing its working authentication code */
+
+.fs-auth-firebase .panel.advanced-panel {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.fs-auth-firebase .advanced-panel > h3,
+.fs-auth-firebase .advanced-panel > p.fine {
+  display: none;
+}
+
+.fs-auth-firebase .filter-pills {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 23px;
+}
+
+.fs-auth-firebase .filter-pills button {
+  flex: 1;
+  min-height: 42px;
+  border-radius: 10px;
+}
+
+.fs-auth-firebase .payment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.fs-auth-firebase .payment-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  color: #bad0f1;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fs-auth-firebase .payment-form input {
+  display: block;
+  width: 100%;
+  min-height: 47px;
+  padding: 12px 13px;
+  border-radius: 10px;
+  background: #0c172a;
+  border: 1px solid #344969;
+  color: #f5f8ff;
+  outline: none;
+}
+
+.fs-auth-firebase .payment-form input:focus {
+  border-color: #5f91ff;
+  box-shadow: 0 0 0 3px rgba(70, 119, 238, 0.14);
+}
+
+.fs-auth-firebase .payment-form .primary {
+  width: 100%;
+  min-height: 47px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 10px;
+  margin-top: 5px;
+  background: #3368ed;
+  color: #fff;
+  font-weight: 700;
+}
+
+.fs-auth-firebase .advanced-panel > .outline-btn {
+  display: flex;
+  width: 100%;
+  min-height: 45px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 14px;
+  border-radius: 10px;
+}
+
+.fs-auth-firebase .auth-profile {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #344969;
+  border-radius: 12px;
+  background: #122440;
+}
+
+.fs-auth-firebase .auth-profile p,
+.fs-auth-firebase .auth-profile small {
+  color: #9db3d2;
+  overflow-wrap: anywhere;
+}
+
+.fs-auth-firebase .verification-actions {
+  margin-top: 18px;
+}
+
+.fs-auth-firebase .verification-actions button {
+  margin: 6px 6px 6px 0;
+}
+
+.fs-auth-firebase .feedback {
+  overflow-wrap: anywhere;
+  margin-top: 15px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.fs-auth-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin-bottom: 17px;
+  padding: 13px;
+  border: 1px solid #7d4050;
+  background: #401e2c;
+  border-radius: 10px;
+  color: #ffb6be;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.fs-auth-alert svg {
+  flex-shrink: 0;
+}
+
+.fs-auth-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+
+.fs-auth-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 39px;
+  padding: 8px 12px;
+  background: #142843;
+  border: 1px solid #385174;
+  border-radius: 9px;
+  color: #d6e7ff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.fs-auth-action:hover {
+  background: #1e3b63;
+}
+
+.fs-auth-trust {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding-top: 22px;
+  margin-top: 23px;
+  border-top: 1px solid #2a405f;
+  color: #879fbd;
+  font-size: 11px;
+  text-align: center;
+}
+
+.fs-auth-trust svg {
+  color: #2bd1a1;
+  flex-shrink: 0;
+}
+
+/* Initial session verification */
+
+.fs-auth-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: 24px;
+  gap: 16px;
+  text-align: center;
+}
+
+.fs-auth-loading h1 {
+  margin: 8px 0 0;
+  font-size: 27px;
+  color: #f5f8ff;
+}
+
+.fs-auth-loading p {
+  margin: 0;
+  color: #9db4d6;
+}
+
+.fs-auth-spinner {
+  margin-top: 18px;
+  color: #6da0ff;
+  animation: fs-auth-spin 1.2s linear infinite;
+}
+
+@keyframes fs-auth-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 920px) {
+  .fs-auth-layout {
+    grid-template-columns: 1fr;
+    gap: 36px;
+    padding: 35px 5%;
+  }
+
+  .fs-auth-showcase {
+    gap: 22px;
+  }
+
+  .fs-auth-hero h2 {
+    font-size: clamp(31px, 7vw, 49px);
+  }
+
+  .fs-auth-features {
+    display: none;
+  }
+
+  .fs-auth-form-side {
+    padding-bottom: 35px;
+  }
+}
+
+@media (max-width: 540px) {
+  .fs-auth-layout {
+    padding: 22px 16px;
+  }
+
+  .fs-auth-brand h1 {
+    font-size: 21px;
+  }
+
+  .fs-auth-hero h2 {
+    font-size: 32px;
+    letter-spacing: -1.1px;
+    margin: 17px 0;
+  }
+
+  .fs-auth-hero > p {
+    font-size: 13px;
+  }
+
+  .fs-auth-card {
+    padding: 21px 17px;
+    border-radius: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fs-auth-spinner {
+    animation: none;
+  }
+}
