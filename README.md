@@ -227,26 +227,46 @@ accuracy on real-world banking transactions.
 
 ---
 
+
+
 ## 📸 Application Screenshots
 
-Add actual screenshots from your running application
-to the `docs/screenshots/` folder.
+### 1. Main Dashboard
 
-Recommended screenshots:
+![FraudShield AI Dashboard](docs/screenshorts/dashboard.png)
 
-1. Overview dashboard   :  [C:\Users\moham_ji328n6\OneDrive\Desktop\FraudShield-AI\docs\screenshorts\dashboard.png]
-2. UPI transaction simulator : [C:\Users\moham_ji328n6\OneDrive\Desktop\FraudShield-AI\docs\screenshorts\upi-simulator.png]
-3. Transaction analytics : [C:\Users\moham_ji328n6\OneDrive\Desktop\FraudShield-AI\docs\screenshorts\Transaction-History.png]
-4. Analysis : [C:\Users\moham_ji328n6\OneDrive\Desktop\FraudShield-AI\docs\screenshorts\analytics.png]
-5. Investigation management : [C:\Users\moham_ji328n6\OneDrive\Desktop\FraudShield-AI\docs\screenshorts\investigation.png]
-6. Ml Research : [C:\Users\moham_ji328n6\OneDrive\Desktop\FraudShield-AI\docs\screenshorts\Ml Research.png]
-7. AI Fraud Copilot : [C:\Users\moham_ji328n6\OneDrive\Desktop\FraudShield-AI\docs\screenshorts\Ai assistence.png]
-8. Reports : [C:\Users\moham_ji328n6\OneDrive\Desktop\FraudShield-AI\docs\screenshorts\reports.png]
-9. Security and authentication : [C:\Users\moham_ji328n6\OneDrive\Desktop\FraudShield-AI\docs\screenshorts\login.png]
+### 2. UPI Transaction Simulator
 
-Screenshots should use fictional or redacted data.
+![UPI Transaction Simulator](docs/screenshorts/upi-simulator.png)
 
----
+### 3. Transaction History
+
+![Transaction History](docs/screenshorts/Transaction-History.png)
+
+### 4. Fraud Analytics
+
+![Fraud Analytics](docs/screenshorts/analytics.png)
+
+### 5. Investigation Management
+
+![Investigation Management](docs/screenshorts/investigation.png)
+
+### 6. Machine Learning Research
+
+![Machine Learning Research](<docs/screenshorts/Ml%20Research.png>)
+
+### 7. AI Fraud Copilot
+
+![AI Fraud Copilot](<docs/screenshorts/Ai%20assistence.png>)
+
+### 8. Investigation Reports
+
+![Investigation Reports](docs/screenshorts/reports.png)
+
+### 9. Security and Authentication
+
+![FraudShield AI Login](docs/screenshorts/login.png)
+
 
 ## 📁 Project Structure
 
