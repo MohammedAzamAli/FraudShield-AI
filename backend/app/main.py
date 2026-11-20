@@ -230,3 +230,7 @@ app.include_router(advanced_router)
 
 from .copilot import router as copilot_router
 app.include_router(copilot_router)
+
+# Flagship Synthetic Fraud Network Explorer router
+from .network import router as network_router
+app.include_router(network_router)
