@@ -1,0 +1,241 @@
+{
+  "metadata": {
+    "dataset_rows": 20000,
+    "train_rows": 14000,
+    "val_rows": 3000,
+    "test_rows": 3000,
+    "fraud_prevalence": 0.5,
+    "feature_count": 20,
+    "features": [
+      "Transaction Amount",
+      "Transaction Frequency",
+      "Recipient Verification Status",
+      "Recipient Blacklist Status",
+      "Device Fingerprinting",
+      "VPN or Proxy Usage",
+      "Geo-Location Flags",
+      "Behavioral Biometrics",
+      "Time Since Last Transaction",
+      "Social Trust Score",
+      "Account Age",
+      "High-Risk Transaction Times",
+      "Past Fraudulent Behavior Flags",
+      "Location-Inconsistent Transactions",
+      "Normalized Transaction Amount",
+      "Transaction Context Anomalies",
+      "Fraud Complaints Count",
+      "Merchant Category Mismatch",
+      "User Daily Limit Exceeded",
+      "Recent High-Value Transaction Flags"
+    ]
+  },
+  "models": {
+    "Random Forest": {
+      "train_time_sec": 0.721,
+      "inference_latency_ms_per_tx": 0.0351,
+      "accuracy": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1_score": 1.0,
+      "roc_auc": 1.0,
+      "pr_auc": 1.0,
+      "specificity": 1.0,
+      "false_positive_rate": 0.0,
+      "false_negative_rate": 0.0,
+      "confusion_matrix": [
+        [
+          1500,
+          0
+        ],
+        [
+          0,
+          1500
+        ]
+      ]
+    },
+    "HistGradientBoosting": {
+      "train_time_sec": 0.945,
+      "inference_latency_ms_per_tx": 0.0108,
+      "accuracy": 0.999,
+      "precision": 0.998003992015968,
+      "recall": 1.0,
+      "f1_score": 0.999000999000999,
+      "roc_auc": 1.0,
+      "pr_auc": 1.0,
+      "specificity": 0.998,
+      "false_positive_rate": 0.002,
+      "false_negative_rate": 0.0,
+      "confusion_matrix": [
+        [
+          1497,
+          3
+        ],
+        [
+          0,
+          1500
+        ]
+      ]
+    },
+    "Logistic Regression": {
+      "train_time_sec": 0.129,
+      "inference_latency_ms_per_tx": 0.0037,
+      "accuracy": 0.9983333333333333,
+      "precision": 0.9966777408637874,
+      "recall": 1.0,
+      "f1_score": 0.9983361064891847,
+      "roc_auc": 0.9999311111111111,
+      "pr_auc": 0.9999294140043148,
+      "specificity": 0.9966666666666667,
+      "false_positive_rate": 0.0033333333333333335,
+      "false_negative_rate": 0.0,
+      "confusion_matrix": [
+        [
+          1495,
+          5
+        ],
+        [
+          0,
+          1500
+        ]
+      ]
+    },
+    "Ensemble (RF + HistGB + LR)": {
+      "inference_latency_ms_per_tx": 0.0,
+      "decision_threshold_used": 0.8,
+      "accuracy": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1_score": 1.0,
+      "roc_auc": 1.0,
+      "pr_auc": 1.0,
+      "specificity": 1.0,
+      "false_positive_rate": 0.0,
+      "false_negative_rate": 0.0,
+      "confusion_matrix": [
+        [
+          1500,
+          0
+        ],
+        [
+          0,
+          1500
+        ]
+      ]
+    }
+  },
+  "threshold_analysis": {
+    "sweep": [
+      {
+        "threshold": 0.05,
+        "val_precision": 0.9640102827763496,
+        "val_recall": 1.0,
+        "val_f1": 0.981675392670157
+      },
+      {
+        "threshold": 0.1,
+        "val_precision": 0.9823182711198428,
+        "val_recall": 1.0,
+        "val_f1": 0.9910802775024777
+      },
+      {
+        "threshold": 0.15,
+        "val_precision": 0.9868421052631579,
+        "val_recall": 1.0,
+        "val_f1": 0.9933774834437086
+      },
+      {
+        "threshold": 0.2,
+        "val_precision": 0.9933774834437086,
+        "val_recall": 1.0,
+        "val_f1": 0.9966777408637874
+      },
+      {
+        "threshold": 0.25,
+        "val_precision": 0.9960159362549801,
+        "val_recall": 1.0,
+        "val_f1": 0.998003992015968
+      },
+      {
+        "threshold": 0.3,
+        "val_precision": 0.9966777408637874,
+        "val_recall": 1.0,
+        "val_f1": 0.9983361064891847
+      },
+      {
+        "threshold": 0.35,
+        "val_precision": 0.9973404255319149,
+        "val_recall": 1.0,
+        "val_f1": 0.9986684420772304
+      },
+      {
+        "threshold": 0.4,
+        "val_precision": 0.9973404255319149,
+        "val_recall": 1.0,
+        "val_f1": 0.9986684420772304
+      },
+      {
+        "threshold": 0.45,
+        "val_precision": 0.998003992015968,
+        "val_recall": 1.0,
+        "val_f1": 0.999000999000999
+      },
+      {
+        "threshold": 0.5,
+        "val_precision": 0.9993337774816788,
+        "val_recall": 1.0,
+        "val_f1": 0.9996667777407531
+      },
+      {
+        "threshold": 0.55,
+        "val_precision": 0.9993337774816788,
+        "val_recall": 1.0,
+        "val_f1": 0.9996667777407531
+      },
+      {
+        "threshold": 0.6,
+        "val_precision": 0.9993337774816788,
+        "val_recall": 1.0,
+        "val_f1": 0.9996667777407531
+      },
+      {
+        "threshold": 0.65,
+        "val_precision": 0.9993337774816788,
+        "val_recall": 1.0,
+        "val_f1": 0.9996667777407531
+      },
+      {
+        "threshold": 0.7,
+        "val_precision": 0.9993337774816788,
+        "val_recall": 1.0,
+        "val_f1": 0.9996667777407531
+      },
+      {
+        "threshold": 0.75,
+        "val_precision": 0.9993337774816788,
+        "val_recall": 1.0,
+        "val_f1": 0.9996667777407531
+      },
+      {
+        "threshold": 0.8,
+        "val_precision": 1.0,
+        "val_recall": 1.0,
+        "val_f1": 1.0
+      },
+      {
+        "threshold": 0.85,
+        "val_precision": 1.0,
+        "val_recall": 1.0,
+        "val_f1": 1.0
+      },
+      {
+        "threshold": 0.9,
+        "val_precision": 1.0,
+        "val_recall": 1.0,
+        "val_f1": 1.0
+      }
+    ],
+    "optimal_threshold": 0.8,
+    "optimal_val_f1": 1.0
+  },
+  "selected_production_model": "Ensemble (RF + HistGB + LR)"
+}

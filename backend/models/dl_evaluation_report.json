@@ -1,0 +1,63 @@
+{
+  "autoencoder": {
+    "architecture": "Deep Anomaly Autoencoder (PyTorch 24-16-8-4-8-16-24)",
+    "latent_bottleneck_dim": 4,
+    "calibration": {
+      "baseline_normal_mse_mean": 0.37830960750579834,
+      "baseline_normal_mse_std": 0.19260236783123016,
+      "optimal_threshold": 0.55
+    },
+    "test_metrics": {
+      "inference_latency_ms_per_tx": 0.0006,
+      "accuracy": 0.855,
+      "precision": 0.7989893318360471,
+      "recall": 0.9486666666666667,
+      "f1_score": 0.867418469978665,
+      "roc_auc": 0.9218777777777777,
+      "pr_auc": 0.9008084175759702,
+      "specificity": 0.7613333333333333,
+      "false_positive_rate": 0.23866666666666667,
+      "false_negative_rate": 0.051333333333333335,
+      "confusion_matrix": [
+        [
+          1142,
+          358
+        ],
+        [
+          77,
+          1423
+        ]
+      ]
+    }
+  },
+  "sequence_gru": {
+    "architecture": "Bidirectional GRU (2 layers, hidden_dim=16, window=5)",
+    "optimal_threshold": 0.1,
+    "test_metrics": {
+      "inference_latency_ms_per_tx": 0.0078,
+      "accuracy": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1_score": 1.0,
+      "roc_auc": 1.0,
+      "pr_auc": 1.0,
+      "specificity": 1.0,
+      "false_positive_rate": 0.0,
+      "false_negative_rate": 0.0,
+      "confusion_matrix": [
+        [
+          1500,
+          0
+        ],
+        [
+          0,
+          1500
+        ]
+      ]
+    }
+  },
+  "synthesis": {
+    "description": "Multi-tier Deep Learning providing unsupervised latent reconstruction anomaly score and temporal behavioral sequence risk score.",
+    "status": "Production Ready"
+  }
+}
