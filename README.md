@@ -137,8 +137,7 @@ flowchart TD
     A --> M[ML Research and Evaluation]
     A --> C[AI Fraud Copilot]
 
-    C --> G[Google Gemini]
-    C --> Q[Groq / Other Configured Providers]
+    C --> G[Google Gemini API]
 
     A --> I[Investigation Management]
     A --> W[Simulated Transaction Alerts]
@@ -155,8 +154,9 @@ transaction and investigation data.
 
 Firebase supports identity verification and access control.
 The ML research pipeline evaluates classification algorithms.
-External generative AI providers assist with explanations
-and investigation reports.
+Google Gemini powers the Copilot chat, screenshot
+review, and investigation report drafts, as well as
+optional memo generation in the agent workflow.
 
 AI recommendations require human review.
 
@@ -171,7 +171,7 @@ AI recommendations require human review.
 | Database                 | SQLAlchemy, SQLite / PostgreSQL support |
 | Authentication           | Firebase Authentication                 |
 | Machine Learning         | Scikit-learn, Pandas, NumPy             |
-| Generative AI            | Google Gemini, Groq, OpenAI integration |
+| Generative AI            | Google Gemini API only                  |
 | Live Communication       | WebSockets                              |
 | Version Control          | Git, GitHub                             |
 | Deployment Configuration | Docker, Docker Compose                  |
@@ -315,7 +315,7 @@ newer development branches.
 - Node.js and npm
 - Git
 - A configured Firebase project
-- Optional API keys for external AI providers
+- Google Gemini API key for Copilot features
 
 ### 1. Clone the repository
 
@@ -386,14 +386,15 @@ your own project credentials.
 Administrator roles must be assigned through
 the authorized project setup workflow.
 
-### 5. AI provider configuration
+### 5. Gemini configuration
 
-Set the supported provider API keys in
-your backend environment file.
+Set `GEMINI_API_KEY` in `backend/.env`.
+Optionally set `GEMINI_MODEL` to choose the Gemini model (default: `gemini-flash-lite-latest`).
+The AI Fraud Copilot uses Gemini only for chat,
+screenshot review, and case report drafts.
 
-AI features may be unavailable if provider
-billing, quotas, permissions, or connectivity
-are insufficient.
+Copilot requires a valid key, API access, quota,
+and network connectivity. API errors are shown in the Copilot so you can identify whether the problem is the key, model access, quota, or network.
 
 Do not upload actual customer financial data
 to external AI services.
@@ -427,7 +428,7 @@ configured services, and the selected release.
 - Authentication is handled through Firebase.
 - Protected actions require authorization.
 - Only synthetic or appropriately redacted
-  information should be supplied to AI providers.
+  information should be sent to Google Gemini.
 - AI-generated results are advisory.
 - Production deployment requires additional
   security testing and access-control verification.

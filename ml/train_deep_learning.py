@@ -18,6 +18,10 @@ from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score,
     roc_auc_score, average_precision_score, confusion_matrix
 )
+try:
+    from .dataset_utils import load_labeled_training_data
+except ImportError:
+    from dataset_utils import load_labeled_training_data
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_PATH = ROOT / "data" / "original_synthetic_fraud.csv"
@@ -81,7 +85,8 @@ class TemporalSequenceGRU(nn.Module):
 # ----------------- Training & Evaluation Pipeline -----------------
 def train_deep_learning():
     print(f"Loading data from {DATA_PATH} for Deep Learning training...")
-    df = pd.read_csv(DATA_PATH)
+    all_rows, df, X, y_series = load_labeled_training_data(DATA_PATH)
+    print(f"Training on {len(df)} labeled rows; excluding {len(all_rows) - len(df)} unlabeled sandbox rows.")
     
     # Load the preprocessor fitted in ML training to guarantee exact identical feature mapping
     ml_bundle_path = OUT_DIR / "production_ml_pipeline.joblib"
@@ -89,8 +94,7 @@ def train_deep_learning():
     ml_bundle = joblib.load(ml_bundle_path)
     preprocessor = ml_bundle["preprocessor"]
     
-    X = df.drop(columns=["Label"])
-    y = df["Label"].astype(int).values
+    y = y_series.astype(int).values
     
     # Stratified Train (70%), Val (15%), Test (15%)
     X_train_df, X_temp_df, y_train, y_temp = train_test_split(

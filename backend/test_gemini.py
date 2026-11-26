@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).with_name(".env"))
 
 key = os.getenv("GEMINI_API_KEY", "").strip()
-model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
+model = os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest").strip()
 model = model.removeprefix("models/")
 
 if not key:

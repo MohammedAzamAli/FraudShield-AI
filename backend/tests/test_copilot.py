@@ -7,12 +7,14 @@ from app import copilot
 from unittest.mock import patch
 import base64, json
 
-def test_missing_provider_key(monkeypatch):
-    monkeypatch.delenv('OPENAI_API_KEY', raising=False)
-    with pytest.raises(HTTPException) as e: copilot._provider('openai')
+def test_missing_gemini_key(monkeypatch):
+    monkeypatch.delenv('GEMINI_API_KEY', raising=False)
+    with pytest.raises(HTTPException) as e: copilot._provider('gemini')
     assert e.value.status_code==503
 
 def test_unrecognized_provider_rejected():
+    with pytest.raises(HTTPException) as e: copilot._provider('openai')
+    assert e.value.status_code==422
     with pytest.raises(HTTPException) as e: copilot._provider('invalid')
     assert e.value.status_code==422
 

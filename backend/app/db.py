@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 from sqlalchemy import (
     create_engine, Column, String, Float, Integer, Boolean,
-    DateTime, Text, ForeignKey, Index
+    DateTime, Time, Text, ForeignKey, Index
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 
@@ -73,6 +73,18 @@ class Transaction(Base):
     # Context features
     hour = Column(Integer, nullable=False)
     typical_amount = Column(Float, nullable=False)
+    average_amount_30d = Column(Float, nullable=False, default=2500.0)
+    transactions_last_24h = Column(Integer, nullable=False, default=1)
+    first_merchant_visit = Column(Boolean, nullable=False, default=False)
+    payment_service_provider = Column(String(40), nullable=False, default="Unspecified")
+    merchant_category = Column(String(60), nullable=False, default="General")
+    transaction_state = Column(String(40), nullable=False, default="Unspecified")
+    device_os = Column(String(20), nullable=False, default="Unknown")
+    transaction_time = Column(Time, nullable=True)
+    screening_mode = Column(String(20), nullable=False, default="balanced")
+    screening_cutoff = Column(Float, nullable=False, default=0.25)
+    # Kept as JSON for compatibility and optional, evolving sandbox metadata.
+    input_context = Column(Text, nullable=False, default="{}")
     recent_count_1h = Column(Integer, default=1)
     time_since_last_sec = Column(Float, default=3600.0)
     is_new_recipient = Column(Boolean, default=False)
@@ -167,3 +179,6 @@ class RiskPolicyConfig(Base):
 # Indices for high speed querying
 Index("idx_tx_time_risk", Transaction.timestamp.desc(), Transaction.risk_tier)
 Index("idx_tx_sender_time", Transaction.sender_upi, Transaction.timestamp.desc())
+Index("idx_tx_flow_time", Transaction.channel, Transaction.timestamp.desc())
+Index("idx_tx_category_time", Transaction.merchant_category, Transaction.timestamp.desc())
+Index("idx_tx_state_time", Transaction.transaction_state, Transaction.timestamp.desc())

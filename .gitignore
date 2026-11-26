@@ -31,6 +31,8 @@ coverage/
 *.db-wal
 *.db-shm
 *.backup.db
+/data/ieee_cis/raw/
+/data/ieee_cis/processed/
 
 # Logs
 *.log

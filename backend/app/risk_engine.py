@@ -40,7 +40,12 @@ class RiskEngineConfig:
 
 DEFAULT_CONFIG = RiskEngineConfig()
 
-def compute_behavioral_score(features: pd.DataFrame, customer: CustomerProfile) -> Tuple[float, List[str]]:
+def compute_behavioral_score(
+    features: pd.DataFrame,
+    customer: CustomerProfile,
+    first_merchant_visit: bool = False,
+    channel: str = ""
+) -> Tuple[float, List[str]]:
     score = 0.0
     reasons = []
     norm_amt = float(features["Normalized Transaction Amount"].iloc[0])
@@ -61,10 +66,20 @@ def compute_behavioral_score(features: pd.DataFrame, customer: CustomerProfile) 
     if limit_exceeded:
         score += 40.0
         reasons.append(f"Payment exceeds customer's daily limit of ₹{customer.daily_spending_limit:,.0f}")
+
+    if first_merchant_visit:
+        score += 15.0
+        reasons.append("First recorded visit to this merchant")
+    if channel == "COLLECT_REQUEST":
+        score += 10.0
+        reasons.append("UPI collect request flow requires the payer to verify the request before approving")
+        if first_merchant_visit:
+            score += 10.0
+            reasons.append("Collect request is from a merchant the customer has not visited before")
         
     return min(100.0, score), reasons
 
-def compute_velocity_score(features: pd.DataFrame) -> Tuple[float, List[str]]:
+def compute_velocity_score(features: pd.DataFrame, transactions_last_24h: int | None = None) -> Tuple[float, List[str]]:
     score = 0.0
     reasons = []
     freq = int(features["Transaction Frequency"].iloc[0])
@@ -76,6 +91,14 @@ def compute_velocity_score(features: pd.DataFrame) -> Tuple[float, List[str]]:
     elif freq >= 3 or time_since_min < 5.0:
         score += 45.0
         reasons.append(f"Elevated transaction velocity: {freq} transfers in the last hour")
+
+    if transactions_last_24h is not None:
+        if transactions_last_24h >= 20:
+            score = max(score, 80.0)
+            reasons.append(f"High transaction volume: {transactions_last_24h} transfers in the last 24 hours")
+        elif transactions_last_24h >= 10:
+            score = max(score, 45.0)
+            reasons.append(f"Elevated transaction volume: {transactions_last_24h} transfers in the last 24 hours")
         
     return min(100.0, score), reasons
 
@@ -122,6 +145,10 @@ def compute_beneficiary_score(features: pd.DataFrame, beneficiary: BeneficiaryPr
     if complaints > 0:
         score += min(40.0, complaints * 8.0)
         reasons.append(f"Recipient has {complaints} recorded customer fraud dispute(s)")
+
+    if beneficiary.category in ("Money Mule Account", "Phishing Collect"):
+        score += 40.0
+        reasons.append(f"Merchant category is marked as {beneficiary.category}")
         
     return min(100.0, score), reasons
 
@@ -132,7 +159,10 @@ def evaluate_transaction_risk(
     ml_output: dict,
     dl_ae_output: dict,
     dl_seq_output: dict,
-    config: RiskEngineConfig = DEFAULT_CONFIG
+    config: RiskEngineConfig = DEFAULT_CONFIG,
+    transactions_last_24h: int | None = None,
+    first_merchant_visit: bool = False,
+    channel: str = ""
 ) -> dict:
     """Consolidates all layers into a final 0-100 risk score and deterministic decision."""
     ml_prob = ml_output.get("ensemble_fraud_probability", 0.0)
@@ -143,8 +173,8 @@ def evaluate_transaction_risk(
     dl_ae_scaled = dl_ae_prob * 100.0
     dl_seq_scaled = dl_seq_prob * 100.0
     
-    beh_score, beh_reasons = compute_behavioral_score(features, customer)
-    vel_score, vel_reasons = compute_velocity_score(features)
+    beh_score, beh_reasons = compute_behavioral_score(features, customer, first_merchant_visit, channel)
+    vel_score, vel_reasons = compute_velocity_score(features, transactions_last_24h)
     dev_score, dev_reasons = compute_device_score(features)
     ben_score, ben_reasons = compute_beneficiary_score(features, beneficiary)
     

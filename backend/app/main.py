@@ -6,7 +6,7 @@ os.environ.setdefault("LOKY_MAX_CPU_COUNT", "2")
 
 """FraudShield AI — Production-Inspired Financial Fraud Detection Platform.
 Integrates Tabular ML Ensemble, PyTorch Deep Learning Anomaly & Sequence Networks,
-Centralized Deterministic Policy Engine, Controlled 5-Agent Swarm, and Gemini GenAI.
+Centralized Deterministic Policy Engine, Controlled 5-Agent Swarm, and Gemini Copilot.
 """
 import json
 import os
@@ -15,18 +15,19 @@ import io
 import csv
 import hmac
 import time
+from dataclasses import replace
 from uuid import uuid4
 from datetime import datetime, timezone
 from pathlib import Path
 from collections import Counter
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Literal
 
 from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect, Header, Query
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func
+from sqlalchemy import select, func, inspect, text, bindparam, Time
 
 from .db import (
     Base, engine, SessionLocal, Transaction, User, CaseAudit, CaseAssignment,
@@ -40,7 +41,9 @@ from .ml_engine import get_ml_engine
 from .risk_engine import evaluate_transaction_risk, RiskEngineConfig, DEFAULT_CONFIG
 from .agent_swarm import get_investigation_orchestrator
 from .gemini_service import get_gemini_service
+from .gemini_service import GeminiUnavailableError
 from .simulation_engine import get_simulation_engine
+from .security import current_user, require_role
 
 app = FastAPI(
     title="FraudShield AI — Financial Fraud Detection Platform",
@@ -66,6 +69,79 @@ app.add_middleware(
 
 # Ensure database tables exist
 Base.metadata.create_all(bind=engine)
+_transaction_column_migrations = {
+    "input_context": "TEXT NOT NULL DEFAULT '{}'",
+    "average_amount_30d": "FLOAT NOT NULL DEFAULT 2500.0",
+    "transactions_last_24h": "INTEGER NOT NULL DEFAULT 1",
+    "first_merchant_visit": "BOOLEAN NOT NULL DEFAULT FALSE",
+    "payment_service_provider": "VARCHAR(40) NOT NULL DEFAULT 'Unspecified'",
+    "merchant_category": "VARCHAR(60) NOT NULL DEFAULT 'General'",
+    "transaction_state": "VARCHAR(40) NOT NULL DEFAULT 'Unspecified'",
+    "device_os": "VARCHAR(20) NOT NULL DEFAULT 'Unknown'",
+    "transaction_time": "TIME NULL",
+    "screening_mode": "VARCHAR(20) NOT NULL DEFAULT 'balanced'",
+    "screening_cutoff": "FLOAT NOT NULL DEFAULT 0.25",
+}
+_existing_transaction_columns = {column["name"] for column in inspect(engine).get_columns("transactions")}
+_added_transaction_columns = _transaction_column_migrations.keys() - _existing_transaction_columns
+if _added_transaction_columns:
+    with engine.begin() as connection:
+        for column_name in _added_transaction_columns:
+            connection.execute(text(
+                f"ALTER TABLE transactions ADD COLUMN {column_name} {_transaction_column_migrations[column_name]}"
+            ))
+
+    # Preserve context that earlier versions stored only in input_context JSON.
+    _backfill = text("""
+        UPDATE transactions SET
+            average_amount_30d=:average_amount_30d,
+            transactions_last_24h=:transactions_last_24h,
+            first_merchant_visit=:first_merchant_visit,
+            payment_service_provider=:payment_service_provider,
+            merchant_category=:merchant_category,
+            transaction_state=:transaction_state,
+            device_os=:device_os,
+            transaction_time=:transaction_time,
+            screening_mode=:screening_mode,
+            screening_cutoff=:screening_cutoff
+        WHERE id=:id
+    """).bindparams(bindparam("transaction_time", type_=Time()))
+    with engine.begin() as connection:
+        _legacy_rows = connection.execute(text("""
+            SELECT id, input_context, channel, hour, typical_amount,
+                   is_new_recipient, device_is_new, vpn_detected
+            FROM transactions
+            WHERE input_context IS NOT NULL AND input_context <> '{}'
+        """)).mappings().all()
+        for _row in _legacy_rows:
+            try:
+                _context = json.loads(_row["input_context"] or "{}")
+            except (TypeError, ValueError):
+                continue
+            if not isinstance(_context, dict) or not _context:
+                continue
+            _time_value = _context.get("transaction_time") or f"{int(_row['hour'] or 0):02d}:00"
+            try:
+                _time_value = datetime.strptime(_time_value, "%H:%M").time()
+            except (TypeError, ValueError):
+                _time_value = None
+            connection.execute(_backfill, {
+                "id": _row["id"],
+                "average_amount_30d": _context.get("average_amount_30d", _row["typical_amount"]),
+                "transactions_last_24h": _context.get("transactions_last_24h", 1),
+                "first_merchant_visit": _context.get("first_merchant_visit", _row["is_new_recipient"]),
+                "payment_service_provider": _context.get("payment_service_provider", "Unspecified"),
+                "merchant_category": _context.get("merchant_category", "General"),
+                "transaction_state": _context.get("transaction_state", "Unspecified"),
+                "device_os": _context.get("device_os", "Unknown"),
+                "transaction_time": _time_value,
+                "screening_mode": _context.get("screening_mode", "balanced"),
+                "screening_cutoff": _context.get("screening_cutoff", 0.25),
+            })
+
+# Add the new query indexes to databases whose transactions table predates them.
+for _index_name in ("idx_tx_flow_time", "idx_tx_category_time", "idx_tx_state_time"):
+    next(index for index in Transaction.__table__.indexes if index.name == _index_name).create(engine, checkfirst=True)
 
 def db_session():
     db = SessionLocal()
@@ -83,7 +159,16 @@ class PaymentRequest(BaseModel):
     recent_count: Optional[int] = Field(default=None, ge=0, le=100)
     hour: Optional[int] = Field(default=None, ge=0, le=23)
     new_recipient: Optional[bool] = Field(default=None)
-    channel: str = Field(default="UPI_P2P")
+    first_merchant_visit: Optional[bool] = Field(default=None)
+    transactions_last_24h: int = Field(default=1, ge=0, le=500)
+    payment_service_provider: str = Field(default="Unspecified", max_length=40)
+    merchant_category: Optional[str] = Field(default=None, max_length=60)
+    transaction_state: Optional[str] = Field(default=None, max_length=40)
+    device_os: str = Field(default="Unknown", max_length=20)
+    transaction_time: Optional[str] = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    screening_mode: str = Field(default="balanced", pattern=r"^(high|balanced|low|custom)$")
+    screening_cutoff: float = Field(default=0.25, ge=0.0, le=1.0)
+    channel: str = Field(default="UPI_P2P", max_length=30)
     device_is_new: bool = Field(default=False)
     vpn_detected: bool = Field(default=False)
     geo_flag: str = Field(default="normal")
@@ -118,6 +203,10 @@ class PolicyConfigUpdate(BaseModel):
 # ----------------- Serialization Helper -----------------
 def serialize_tx(t: Transaction, risk_assessment: Optional[RiskAssessment] = None) -> dict:
     reasons = json.loads(t.reasons) if (t.reasons and isinstance(t.reasons, str)) else (t.reasons or [])
+    try:
+        input_context = json.loads(t.input_context or "{}")
+    except (TypeError, ValueError):
+        input_context = {}
     data = {
         "id": t.id,
         "timestamp": t.timestamp.isoformat() if t.timestamp else None,
@@ -127,9 +216,21 @@ def serialize_tx(t: Transaction, risk_assessment: Optional[RiskAssessment] = Non
         "recipient_name": t.recipient_name,
         "amount": t.amount,
         "channel": t.channel,
+        "upi_flow": t.channel,
         "scenario_type": t.scenario_type,
         "hour": t.hour,
         "typical_amount": t.typical_amount,
+        "average_amount_30d": t.average_amount_30d or t.typical_amount,
+        "transactions_last_24h": t.transactions_last_24h,
+        "first_merchant_visit": t.first_merchant_visit,
+        "payment_service_provider": t.payment_service_provider,
+        "merchant_category": t.merchant_category,
+        "transaction_state": t.transaction_state,
+        "device_os": t.device_os,
+        "transaction_time": t.transaction_time.strftime("%H:%M") if t.transaction_time else input_context.get("transaction_time", f"{t.hour:02d}:00"),
+        "screening_mode": t.screening_mode,
+        "screening_cutoff": t.screening_cutoff,
+        "input_context": input_context,
         "recent_count": t.recent_count_1h,
         "recent_count_1h": t.recent_count_1h,
         "time_since_last_sec": t.time_since_last_sec,
@@ -188,56 +289,66 @@ def health():
 
 @app.get("/api/model/metrics")
 def model_metrics():
-    """Returns comprehensive tabular ML and PyTorch DL evaluation reports."""
-    rep_ml_path = Path(__file__).resolve().parents[1] / "models" / "ml_evaluation_report.json"
-    rep_dl_path = Path(__file__).resolve().parents[1] / "models" / "dl_evaluation_report.json"
-    legacy_path = Path(__file__).resolve().parents[1] / "models" / "metrics.json"
+    """Return the evaluation used by the simulator-aligned research model."""
+    return _load_sandbox_metrics_report()
 
-    result = {}
-    if rep_ml_path.exists():
-        result["ml_evaluation"] = json.loads(rep_ml_path.read_text())
-    elif legacy_path.exists():
-        result["ml_evaluation"] = json.loads(legacy_path.read_text())
 
-    if rep_dl_path.exists():
-        result["dl_evaluation"] = json.loads(rep_dl_path.read_text())
+@app.get("/api/model/dataset-metrics")
+def dataset_model_metrics():
+    """Return the evaluation report for the labeled source dataset."""
+    report_path = Path(__file__).resolve().parents[1] / "models" / "dataset_research_metrics.json"
+    if not report_path.exists():
+        return {
+            "available": False,
+            "message": "Run python ml/evaluate_dataset.py to create the dataset evaluation report.",
+        }
+    return json.loads(report_path.read_text())
 
-    # Backward compatibility fields for legacy frontend tabs
-    if "ml_evaluation" in result:
-        ens = result["ml_evaluation"].get("models", {}).get("Ensemble (RF + HistGB + LR)", {})
-        rf = result["ml_evaluation"].get("models", {}).get("Random Forest", {})
-        target = ens if ens else rf
-        result.update({
-            "accuracy": target.get("accuracy", 0.999),
-            "precision": target.get("precision", 1.0),
-            "recall": target.get("recall", 1.0),
-            "f1": target.get("f1_score", 1.0),
-            "pr_auc": target.get("pr_auc", 1.0),
-            "roc_auc": target.get("roc_auc", 1.0),
-            "train_rows": result["ml_evaluation"].get("metadata", {}).get("train_rows", 14000),
-            "test_rows": result["ml_evaluation"].get("metadata", {}).get("test_rows", 3000),
-            "confusion_matrix": target.get("confusion_matrix", [[1500, 0], [0, 1500]])
-        })
-    return result
+
+def _load_sandbox_metrics_report():
+    report_path = Path(__file__).resolve().parents[1] / "models" / "sandbox_metrics.json"
+    if not report_path.exists():
+        return {
+            "available": False,
+            "message": "Run python ml/train_sandbox.py to create the evaluation report."
+        }
+
+    report = json.loads(report_path.read_text())
+    return {
+        **report,
+        "available": True,
+        "confusion_matrix_labels": ["Legitimate", "Fraud"]
+    }
 
 @app.get("/api/ml/sandbox-metrics")
 def sandbox_metrics():
-    rep_path = Path(__file__).resolve().parents[1] / "models" / "ml_evaluation_report.json"
-    if rep_path.exists():
-        data = json.loads(rep_path.read_text())
-        ens = data.get("models", {}).get("Ensemble (RF + HistGB + LR)", {})
-        return {
-            "dataset": "generated sandbox scenarios",
-            "precision": ens.get("precision", 1.0),
-            "recall": ens.get("recall", 1.0),
-            "f1": ens.get("f1_score", 1.0),
-            "pr_auc": ens.get("pr_auc", 1.0),
-            "threshold": ens.get("decision_threshold_used", 0.8),
-            "warning": "Production multi-model ensemble (Random Forest, HistGradientBoosting, Logistic Regression)."
-        }
-    return {"precision": 1.0, "recall": 1.0, "f1": 1.0, "pr_auc": 1.0, "threshold": 0.8}
+    return _load_sandbox_metrics_report()
 
 # ----------------- Core Ingestion & Analysis -----------------
+CITY_STATE = {
+    "mumbai": "Maharashtra", "bengaluru": "Karnataka", "bangalore": "Karnataka",
+    "delhi": "Delhi", "pune": "Maharashtra", "hyderabad": "Telangana",
+    "chennai": "Tamil Nadu", "kolkata": "West Bengal", "ahmedabad": "Gujarat",
+    "jaipur": "Rajasthan"
+}
+
+def _transaction_geo_flag(customer, transaction_state: Optional[str], supplied_flag: str) -> str:
+    if supplied_flag != "normal":
+        return supplied_flag
+    if not transaction_state:
+        return supplied_flag
+    home_state = CITY_STATE.get(str(getattr(customer, "home_city", "")).strip().lower())
+    if home_state and transaction_state and home_state.casefold() != transaction_state.casefold():
+        return "unusual"
+    return supplied_flag
+
+def _first_merchant_visit(req: PaymentRequest, customer, beneficiary) -> bool:
+    if req.first_merchant_visit is not None:
+        return req.first_merchant_visit
+    if req.new_recipient is not None:
+        return req.new_recipient
+    return beneficiary.upi_id not in customer.trusted_beneficiaries
+
 @app.post("/api/analyze")
 async def analyze_payment(req: PaymentRequest, db: Session = Depends(db_session)):
     """Full-tier production risk analysis of an incoming transaction."""
@@ -245,12 +356,17 @@ async def analyze_payment(req: PaymentRequest, db: Session = Depends(db_session)
     sender_upi = req.sender_upi or "rahul.sharma@okaxis"
     customer = get_or_create_customer(sender_upi)
     beneficiary = get_or_create_beneficiary(req.recipient_upi)
+    if req.merchant_category:
+        beneficiary = replace(beneficiary, category=req.merchant_category)
 
     # Use supplied overrides or customer baseline defaults
     typical_amt = req.typical_amount if req.typical_amount is not None else customer.typical_amount
+    customer = replace(customer, typical_amount=typical_amt)
     hour = req.hour if req.hour is not None else datetime.now(timezone.utc).hour
     freq = req.recent_count if req.recent_count is not None else customer.tx_count_last_1h + 1
-    new_rec = req.new_recipient if req.new_recipient is not None else (beneficiary.upi_id not in customer.trusted_beneficiaries)
+    first_merchant_visit = _first_merchant_visit(req, customer, beneficiary)
+    new_rec = first_merchant_visit
+    geo_flag = _transaction_geo_flag(customer, req.transaction_state, req.geo_flag)
 
     print("DEBUG 2: Building features", flush=True)
     features_df = build_feature_vector(
@@ -263,7 +379,7 @@ async def analyze_payment(req: PaymentRequest, db: Session = Depends(db_session)
         is_new_recipient=new_rec,
         device_is_new=req.device_is_new,
         vpn_detected=req.vpn_detected,
-        geo_flag=req.geo_flag,
+        geo_flag=geo_flag,
         biometric_score=req.biometric_score
     )
 
@@ -286,7 +402,10 @@ async def analyze_payment(req: PaymentRequest, db: Session = Depends(db_session)
         beneficiary=beneficiary,
         ml_output=ml_output,
         dl_ae_output=dl_ae_output,
-        dl_seq_output=dl_seq_output
+        dl_seq_output=dl_seq_output,
+        transactions_last_24h=req.transactions_last_24h,
+        first_merchant_visit=first_merchant_visit,
+        channel=req.channel
     )
 
     tx_id = str(uuid4())
@@ -302,7 +421,12 @@ async def analyze_payment(req: PaymentRequest, db: Session = Depends(db_session)
             "id": tx_id, "amount": req.amount, "recipient_upi": req.recipient_upi,
             "sender_upi": customer.upi_id, "hour": hour, "recent_count": freq,
             "channel": req.channel, "device_is_new": req.device_is_new,
-            "vpn_detected": req.vpn_detected, "behavioral_biometric_score": req.biometric_score
+            "vpn_detected": req.vpn_detected, "behavioral_biometric_score": req.biometric_score,
+            "transactions_last_24h": req.transactions_last_24h,
+            "payment_service_provider": req.payment_service_provider,
+            "merchant_category": req.merchant_category or beneficiary.category,
+            "transaction_state": req.transaction_state or "Unspecified",
+            "device_os": req.device_os
         }
         agent_inv_res = orchestrator.run_investigation(
             tx_data=tx_dict, risk_result=risk_res, customer=customer, beneficiary=beneficiary
@@ -322,13 +446,39 @@ async def analyze_payment(req: PaymentRequest, db: Session = Depends(db_session)
         scenario_type="user_manual_submission",
         hour=hour,
         typical_amount=typical_amt,
+        average_amount_30d=typical_amt,
+        transactions_last_24h=req.transactions_last_24h,
+        first_merchant_visit=first_merchant_visit,
+        payment_service_provider=req.payment_service_provider,
+        merchant_category=req.merchant_category or beneficiary.category,
+        transaction_state=req.transaction_state or "Unspecified",
+        device_os=req.device_os,
+        transaction_time=datetime.strptime(req.transaction_time or f"{hour:02d}:00", "%H:%M").time(),
+        screening_mode=req.screening_mode,
+        screening_cutoff=req.screening_cutoff,
+        input_context=json.dumps({
+            "transactions_last_24h": req.transactions_last_24h,
+            "average_amount_30d": typical_amt,
+            "new_device": req.device_is_new,
+            "first_merchant_visit": first_merchant_visit,
+            "vpn_ip": req.vpn_detected,
+            "payment_service_provider": req.payment_service_provider,
+            "upi_flow": req.channel,
+            "merchant_category": req.merchant_category or beneficiary.category,
+            "transaction_state": req.transaction_state or "Unspecified",
+            "device_os": req.device_os,
+            "transaction_time": req.transaction_time or f"{hour:02d}:00",
+            "geo_assessment": geo_flag,
+            "screening_mode": req.screening_mode,
+            "screening_cutoff": req.screening_cutoff
+        }),
         recent_count_1h=freq,
         time_since_last_sec=1800.0,
         is_new_recipient=new_rec,
         device_id=customer.primary_device_id if not req.device_is_new else f"DEV-{uuid4().hex[:6].upper()}",
         device_is_new=req.device_is_new,
         vpn_detected=req.vpn_detected,
-        geo_location_flag=req.geo_flag,
+        geo_location_flag=geo_flag,
         behavioral_biometric_score=req.biometric_score,
         risk_score=risk_res["consolidated_risk_score"],
         risk_tier=risk_res["risk_tier"],
@@ -383,7 +533,13 @@ async def analyze_payment(req: PaymentRequest, db: Session = Depends(db_session)
 def sandbox_predict(req: PaymentRequest):
     """Production ML + DL probability comparison endpoint."""
     customer = get_or_create_customer(req.sender_upi or "rahul.sharma@okaxis")
+    if req.typical_amount is not None:
+        customer = replace(customer, typical_amount=req.typical_amount)
     beneficiary = get_or_create_beneficiary(req.recipient_upi)
+    if req.merchant_category:
+        beneficiary = replace(beneficiary, category=req.merchant_category)
+    geo_flag = _transaction_geo_flag(customer, req.transaction_state, req.geo_flag)
+    first_merchant_visit = _first_merchant_visit(req, customer, beneficiary)
     features_df = build_feature_vector(
         amount=req.amount,
         customer=customer,
@@ -391,10 +547,10 @@ def sandbox_predict(req: PaymentRequest):
         hour=req.hour if req.hour is not None else 12,
         recent_count_1h=req.recent_count if req.recent_count is not None else 1,
         time_since_last_sec=1800.0,
-        is_new_recipient=req.new_recipient if req.new_recipient is not None else True,
+        is_new_recipient=first_merchant_visit,
         device_is_new=req.device_is_new,
         vpn_detected=req.vpn_detected,
-        geo_flag=req.geo_flag,
+        geo_flag=geo_flag,
         biometric_score=req.biometric_score
     )
     seq_window = build_temporal_sequence_window(customer, req.amount, features_df)
@@ -415,7 +571,7 @@ def sandbox_predict(req: PaymentRequest):
             "hist_gradient_boosting": ml_res["hist_gradient_boosting_prob"],
             "logistic_regression": ml_res["logistic_regression_prob"]
         },
-        "warning": "Production multi-tier calibrated fraud detection engine."
+        "warning": "Experimental probability trained on synthetic sandbox labels; it is not calibrated against verified real-world fraud outcomes."
     }
 
 # ----------------- Transactions & Analytics -----------------
@@ -740,11 +896,16 @@ def inspect_qr(req: QRRequest):
         "note": "QR inspector parses payload and matches against fraud blacklist registry."
     }
 
-# ----------------- Gemini GenAI Service Routes -----------------
+# ----------------- Gemini Copilot Service Routes -----------------
+class AIChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=1200)
+
 class AIChatRequest(BaseModel):
-    question: str = Field(min_length=3, max_length=1500)
-    transaction_id: Optional[str] = None
+    question: str = Field(min_length=3, max_length=1200)
+    transaction_id: Optional[str] = Field(default=None, max_length=80)
     language: str = "English"
+    history: List[AIChatMessage] = Field(default_factory=list, max_length=12)
 
 class AIScreenshotRequest(BaseModel):
     image_base64: str = Field(min_length=20)
@@ -752,55 +913,89 @@ class AIScreenshotRequest(BaseModel):
     description: str = ""
 
 class AIReportRequest(BaseModel):
-    transaction_id: str
-    analyst_notes: str = ""
+    transaction_id: str = Field(min_length=4, max_length=80)
+    analyst_notes: str = Field(default="", max_length=1500)
+
+def _live_gemini(method, *args, **kwargs):
+    try:
+        return method(*args, require_live=True, **kwargs)
+    except GeminiUnavailableError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
+
+def _ai_transaction_context(t: Transaction) -> dict:
+    """Pass only minimal, simulated risk evidence to Gemini; omit IDs and names."""
+    return {
+        "simulated": True,
+        "amount_inr": t.amount,
+        "hour": t.hour,
+        "typical_amount_inr": t.typical_amount,
+        "transactions_last_hour": t.recent_count_1h,
+        "new_recipient": t.is_new_recipient,
+        "device_is_new": t.device_is_new,
+        "vpn_detected": t.vpn_detected,
+        "risk_score": t.risk_score,
+        "risk_level": t.risk_tier,
+        "decision": t.decision,
+        "risk_reasons": json.loads(t.reasons or "[]"),
+        "review_status": t.review_status
+    }
 
 @app.get("/api/ai/status")
 def ai_status():
     gemini = get_gemini_service()
     return {
-        "configured": {
-            "gemini": gemini.is_live_configured(),
-            "openai": bool(os.getenv("OPENAI_API_KEY")),
-            "groq": bool(os.getenv("GROQ_API_KEY"))
-        },
+        "provider": "Google Gemini",
+        "configured": gemini.is_live_configured(),
         "active_gemini_model": gemini.model,
-        "mode": "live" if gemini.is_live_configured() else "grounded_fallback",
+        "mode": "ready" if gemini.is_live_configured() else "needs_configuration",
         "calls_made": gemini.call_count,
-        "note": "Google Gemini is active with enterprise fallback protection."
+        "last_error": gemini.last_error,
+        "last_error_status": gemini.last_error_status if gemini.last_error else None,
+        "note": "Copilot requests are sent only to Google Gemini; no local model fallback is used."
     }
 
 @app.post("/api/ai/ask")
-def ai_ask(body: AIChatRequest, db: Session = Depends(db_session)):
+def ai_ask(body: AIChatRequest, actor=Depends(current_user), db: Session = Depends(db_session)):
     gemini = get_gemini_service()
     tx_data = None
     if body.transaction_id:
+        if actor.role not in ("admin", "analyst"):
+            raise HTTPException(403, "Transaction context is available to analysts only")
         t = db.get(Transaction, body.transaction_id)
-        if t: tx_data = serialize_tx(t)
-    return gemini.chat_assistant(body.question, context_tx=tx_data, language=body.language)
+        if not t:
+            raise HTTPException(404, "Transaction not found")
+        tx_data = _ai_transaction_context(t)
+    history = [message.model_dump() for message in body.history]
+    return _live_gemini(
+        gemini.chat_assistant,
+        body.question,
+        context_tx=tx_data,
+        language=body.language,
+        history=history
+    )
 
 @app.post("/api/ai/explain")
-def ai_explain(body: AIChatRequest, db: Session = Depends(db_session)):
+def ai_explain(body: AIChatRequest, actor=Depends(require_role("admin", "analyst")), db: Session = Depends(db_session)):
     if not body.transaction_id:
         raise HTTPException(422, "transaction_id is required")
     t = db.get(Transaction, body.transaction_id)
     if not t:
         raise HTTPException(404, "Transaction not found")
     gemini = get_gemini_service()
-    return gemini.explain_transaction(serialize_tx(t), language=body.language)
+    return _live_gemini(gemini.explain_transaction, _ai_transaction_context(t), language=body.language)
 
 @app.post("/api/ai/report")
-def ai_report(body: AIReportRequest, db: Session = Depends(db_session)):
+def ai_report(body: AIReportRequest, actor=Depends(require_role("admin", "analyst")), db: Session = Depends(db_session)):
     t = db.get(Transaction, body.transaction_id)
     if not t:
         raise HTTPException(404, "Transaction not found")
     gemini = get_gemini_service()
-    return gemini.generate_investigation_report(serialize_tx(t), analyst_notes=body.analyst_notes)
+    return _live_gemini(gemini.generate_investigation_report, _ai_transaction_context(t), analyst_notes=body.analyst_notes)
 
 @app.post("/api/ai/screenshot")
-def ai_screenshot(body: AIScreenshotRequest):
+def ai_screenshot(body: AIScreenshotRequest, actor=Depends(require_role("admin", "analyst"))):
     gemini = get_gemini_service()
-    return gemini.analyze_screenshot(body.image_base64, body.mime_type, body.description)
+    return _live_gemini(gemini.analyze_screenshot, body.image_base64, body.mime_type, body.description)
 
 # ----------------- Backward Compatibility Helpers -----------------
 def load_sandbox_model():

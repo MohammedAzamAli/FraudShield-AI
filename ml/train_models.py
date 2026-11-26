@@ -20,6 +20,10 @@ from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score,
     roc_auc_score, average_precision_score, confusion_matrix
 )
+try:
+    from .dataset_utils import load_labeled_training_data
+except ImportError:
+    from dataset_utils import load_labeled_training_data
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_PATH = ROOT / "data" / "original_synthetic_fraud.csv"
@@ -28,12 +32,11 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 def train_and_evaluate_ml():
     print(f"Loading dataset from {DATA_PATH}...")
-    df = pd.read_csv(DATA_PATH)
-    print(f"Dataset loaded: {df.shape[0]} rows, {df.shape[1]} columns.")
+    all_rows, df, X, y = load_labeled_training_data(DATA_PATH)
+    print(f"Dataset loaded: {len(df)} labeled rows; {len(all_rows) - len(df)} unlabeled rows excluded from training.")
     
     assert "Label" in df.columns, "Label column missing!"
-    X = df.drop(columns=["Label"])
-    y = df["Label"].astype(int)
+    y = y.astype(int)
     
     # Stratified Train (70%), Validation (15%), Test (15%) split
     X_train, X_temp, y_train, y_temp = train_test_split(
@@ -84,6 +87,7 @@ def train_and_evaluate_ml():
     evaluation_results = {
         "metadata": {
             "dataset_rows": len(df),
+            "unlabeled_sandbox_rows_excluded": len(all_rows) - len(df),
             "train_rows": len(X_train),
             "val_rows": len(X_val),
             "test_rows": len(X_test),
